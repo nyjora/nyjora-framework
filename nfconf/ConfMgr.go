@@ -1,39 +1,37 @@
 package nfconf
 
-import "os"
-import "fmt"
-import "encoding/json"
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"sync"
+)
 
-// 所有的config都保存在此，并由ConfMgr统一管理起来
-type TestConfData struct {
-	Ip   string
-	port int
-}
-
-type NetConf struct {
-	TestConfData struct {
+type NetConfig struct {
+	TestConfig struct {
 		Ip   string `json:"ip"`
 		Port int    `json:"port"`
-	} `json:"testConfData"`
-	TestName string `json:"TestName"`
+	} `json:"testconfig`
+	Name string `json:"name"`
 }
 
-var instance *ConfMgr
-var netConf *NetConf
-
-func GetInstance() *ConfMgr {
-	if instance == nil {
-		instance = &ConfMgr{}
-	}
-	return instance
-}
+var NetConf *NetConfig
+var once sync.Once
 
 func Init(filePath string) {
-	confFile, err := os.Open(filePath)
-	defer confFile.Close()
-	if err != nil {
-		fmt.Println(err.Error())
-		return
+	var initFunc = func() {
+		confFile, err := os.Open(filePath)
+		defer confFile.Close()
+		if err != nil {
+			fmt.Println(err.Error())
+			return
+		}
+		var configData NetConfig
+		error := json.NewDecoder(confFile).Decode(&configData)
+		if error != nil {
+			fmt.Printf("Init json config file failed,%s,%s\n", filePath, error)
+		}
+		NetConf = &configData
 	}
-	json.NewDecoder(confFile).Decode(netConf)
+	once.Do(initFunc)
 }
