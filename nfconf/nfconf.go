@@ -7,6 +7,7 @@ import (
 	"sync"
 )
 
+// 映射配置文件的结构体，每个结构体针对一个文件
 type NetConfig struct {
 	TestConfig struct {
 		Ip   string `json:"ip"`
@@ -15,7 +16,7 @@ type NetConfig struct {
 	Name string `json:"name"`
 }
 
-var NetConf *NetConfig
+var NetConf NetConfig
 var once sync.Once
 
 func Init(filePath string) {
@@ -26,12 +27,10 @@ func Init(filePath string) {
 			fmt.Println(err.Error())
 			return
 		}
-		var configData NetConfig
-		error := json.NewDecoder(confFile).Decode(&configData)
-		if error != nil {
-			fmt.Printf("Init json config file failed,%s,%s\n", filePath, error)
+		err = json.NewDecoder(confFile).Decode(&NetConf)
+		if err != nil {
+			fmt.Printf("Init json config file failed,%s,%s\n", filePath, err)
 		}
-		NetConf = &configData
 	}
 	once.Do(initFunc)
 }
