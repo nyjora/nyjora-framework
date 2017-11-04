@@ -1,34 +1,26 @@
 package nfconf
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
+	"io/ioutil"
 	"sync"
+
+	"github.com/bitly/go-simplejson"
 )
 
-// 映射配置文件的结构体，每个结构体针对一个文件
-type NetConfig struct {
-	TestConfig struct {
-		Ip   string `json:"ip"`
-		Port int    `json:"port"`
-	} `json:"testconfig`
-	Name string `json:"name"`
-}
-
-var NetConf NetConfig
+var Conf *simplejson.Json
 var once sync.Once
 
 func Init(filePath string) (e error) {
 	var initFunc = func() {
-		confFile, err := os.Open(filePath)
-		defer confFile.Close()
+		rf, err := ioutil.ReadFile(filePath)
 		if err != nil {
 			fmt.Println(err.Error())
 			e = err
 			return
 		}
-		err = json.NewDecoder(confFile).Decode(&NetConf)
+
+		Conf, err = simplejson.NewJson(rf)
 		if err != nil {
 			fmt.Printf("Init json config file failed,%s,%s\n", filePath, err)
 			e = err
