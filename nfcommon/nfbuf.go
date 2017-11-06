@@ -104,3 +104,7 @@ func (nb *nfbuf) Pop(val interface{}) *nfbuf {
 func (nb *nfbuf) Len() int {
 	return nb.buf.Len()
 }
+
+func (nb *nfbuf) Bytes() []byte {
+	return nb.buf.Bytes()
+}
