@@ -7,6 +7,12 @@ import (
 	"fmt"
 )
 
+const (
+	ERR_UNKNOW_INTERFACE_TYPE = "unknown type of interface."
+	PANIC_PUSH                = "[nfcommon] nfbuf.Push marshal panic."
+	PANIC_POP                 = "[nfcommon] nfbuf.Pop unmarshal panic."
+)
+
 type nfbuf struct {
 	buf *bytes.Buffer
 }
@@ -17,8 +23,8 @@ func NewNFBuf() *nfbuf {
 	}
 }
 
-func (nb *nfbuf) Push(val interface{}) (err error) {
-	fmt.Println("push")
+func (nb *nfbuf) Push(val interface{}) *nfbuf {
+	var err error
 	switch val.(type) {
 	case int:
 		err = binary.Write(nb.buf, binary.LittleEndian, val)
@@ -49,12 +55,16 @@ func (nb *nfbuf) Push(val interface{}) (err error) {
 		_, err = nb.buf.Write(val.([]byte))
 	default:
 		fmt.Println("default")
-		err = errors.New("[nfbuf] Push unknow type.")
+		err = errors.New(ERR_UNKNOW_INTERFACE_TYPE)
 	}
-	return err
+	if err != nil {
+		panic(PANIC_PUSH + err.Error())
+	}
+	return nb
 }
 
-func (nb *nfbuf) Pop(val interface{}) (err error) {
+func (nb *nfbuf) Pop(val interface{}) *nfbuf {
+	var err error
 	switch val.(type) {
 	case *int:
 		err = binary.Read(nb.buf, binary.LittleEndian, val)
@@ -85,7 +95,10 @@ func (nb *nfbuf) Pop(val interface{}) (err error) {
 	default:
 		err = errors.New("[nfbuf] Pop unknow type.")
 	}
-	return err
+	if err != nil {
+		panic(PANIC_POP + err.Error())
+	}
+	return nb
 }
 
 func (nb *nfbuf) Len() int {
