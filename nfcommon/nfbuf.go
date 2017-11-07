@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"fmt"
 )
 
 const (
@@ -13,21 +12,25 @@ const (
 	PANIC_POP                 = "[nfcommon] nfbuf.Pop unmarshal panic."
 )
 
-type nfbuf struct {
+type Nfbuf struct {
 	buf *bytes.Buffer
 }
 
-func NewNFBuf() *nfbuf {
-	return &nfbuf{
+func NewNFBuf() *Nfbuf {
+	return &Nfbuf{
 		buf: new(bytes.Buffer),
 	}
 }
 
-func (nb *nfbuf) Push(val interface{}) *nfbuf {
+func NewNFBufBytes(buf []byte) *Nfbuf {
+	return &Nfbuf{
+		buf: bytes.NewBuffer(buf),
+	}
+}
+
+func (nb *Nfbuf) Push(val interface{}) *Nfbuf {
 	var err error
 	switch val.(type) {
-	case int:
-		err = binary.Write(nb.buf, binary.LittleEndian, val)
 	case int8:
 		err = binary.Write(nb.buf, binary.LittleEndian, val)
 	case int16:
@@ -51,10 +54,8 @@ func (nb *nfbuf) Push(val interface{}) *nfbuf {
 	case uint64:
 		err = binary.Write(nb.buf, binary.LittleEndian, val)
 	case []byte:
-		fmt.Println("write []byte")
 		_, err = nb.buf.Write(val.([]byte))
 	default:
-		fmt.Println("default")
 		err = errors.New(ERR_UNKNOW_INTERFACE_TYPE)
 	}
 	if err != nil {
@@ -63,11 +64,9 @@ func (nb *nfbuf) Push(val interface{}) *nfbuf {
 	return nb
 }
 
-func (nb *nfbuf) Pop(val interface{}) *nfbuf {
+func (nb *Nfbuf) Pop(val interface{}) *Nfbuf {
 	var err error
 	switch val.(type) {
-	case *int:
-		err = binary.Read(nb.buf, binary.LittleEndian, val)
 	case *int8:
 		err = binary.Read(nb.buf, binary.LittleEndian, val)
 	case *int16:
@@ -101,10 +100,18 @@ func (nb *nfbuf) Pop(val interface{}) *nfbuf {
 	return nb
 }
 
-func (nb *nfbuf) Len() int {
-	return nb.buf.Len()
+func (nb *Nfbuf) Len() int32 {
+	return int32(nb.buf.Len())
 }
 
-func (nb *nfbuf) Bytes() []byte {
+func (nb *Nfbuf) Bytes() []byte {
 	return nb.buf.Bytes()
+}
+
+func (nb *Nfbuf) UnCompress() error {
+	return nil
+}
+
+func (nb *Nfbuf) Compress() error {
+	return nil
 }
