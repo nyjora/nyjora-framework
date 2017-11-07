@@ -71,7 +71,7 @@ func (tc *TcpClient) SendProto(id uint32, fromType uint32, fromId uint32, toType
 	if tc.session == nil || tc.connected == false {
 		return
 	}
-	proto := &Protocol{}
+	proto := nfcommon.NewProto()
 	proto.Id = id
 	proto.FromType = fromType
 	proto.FromId = fromId

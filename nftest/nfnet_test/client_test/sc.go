@@ -5,6 +5,7 @@ import (
 	"nyjora-framework/nfcommon"
 	"nyjora-framework/nfconf"
 	"nyjora-framework/nfnet"
+	"nyjora-framework/nfproto"
 	"os"
 	"time"
 )
@@ -45,15 +46,14 @@ func main() {
 		Ip:   nfconf.Conf.Get("clientconfig").Get("ip").MustString(),
 		Port: nfconf.Conf.Get("clientconfig").Get("port").MustInt(),
 	}
-
+	nfproto.Init()
 	tclient := &TcpClientDelegate{}
 	tclient.Init(clientOpt)
 	tclient.Connect()
-	msg := []byte{'f', 'u', 'c', 'k'}
+	msg := []byte{'h', 'e', 'h', 'e'}
 	for {
 		time.Sleep(time.Second * 5)
 		if tclient.tclient.IsValid() {
-			fmt.Println("Begin to send...")
 			tclient.tclient.SendProto(1, 2, 3, 4, 5, msg)
 		}
 	}

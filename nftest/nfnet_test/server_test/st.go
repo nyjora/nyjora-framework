@@ -2,14 +2,14 @@ package main
 
 import (
 	"fmt"
-	"nyjora-framework/nfcommon"
 	"nyjora-framework/nfconf"
 	"nyjora-framework/nfnet"
+	"nyjora-framework/nfproto"
+	"nyjora-framework/nftest/nflogic_test"
+	"nyjora-framework/nftest/nfservice_test"
 	"os"
 	"time"
 )
-
-
 
 func main() {
 	fmt.Println("server_test begin...")
@@ -25,13 +25,12 @@ func main() {
 		Ip:   nfconf.Conf.Get("serverconfig").Get("ip").MustString(""),
 		Port: nfconf.Conf.Get("serverconfig").Get("port").MustInt(0),
 	}
-
-	/*
-	tserver := &TcpServerDelegate{}
-	tserver.Init(serverOpt)
-	go tserver.Serve()
+	nfproto.Init()
+	nflogic_test.Nftestserver = nfservice_test.NewTcpServerDelegate()
+	nflogic_test.Nftestserver.Init(serverOpt)
+	go nflogic_test.Nftestserver.Serve()
 	for {
-		time.Sleep(10000)
+		time.Sleep(time.Second * 60)
 	}
-	*/
+
 }

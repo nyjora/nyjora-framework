@@ -1,7 +1,17 @@
-package server_test
+package nfservice_test
+
+import (
+	"fmt"
+	"nyjora-framework/nfcommon"
+	"nyjora-framework/nfnet"
+)
 
 type TcpServerDelegate struct {
 	tserver *nfnet.TcpServer
+}
+
+func NewTcpServerDelegate() *TcpServerDelegate {
+	return &TcpServerDelegate{}
 }
 
 func (tsd *TcpServerDelegate) Init(opts nfnet.ServerOption) {
@@ -22,5 +32,6 @@ func (tsd *TcpServerDelegate) Serve() {
 	}
 }
 
-var service TcpServerDelegate
-
+func (tsd *TcpServerDelegate) BroadCastChatTest(id uint32, fromType uint32, fromId uint32, toType uint32, toId uint32, data []byte) {
+	tsd.tserver.BroadCast(id, fromType, fromId, toType, toId, data)
+}

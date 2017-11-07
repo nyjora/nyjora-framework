@@ -129,7 +129,7 @@ func (ts *TcpServer) Run() error {
 }
 
 func (ts *TcpServer) BroadCast(id uint32, fromType uint32, fromId uint32, toType uint32, toId uint32, data []byte) {
-	proto := &Protocol{}
+	proto := nfcommon.NewProto()
 	proto.Id = id
 	proto.FromType = fromType
 	proto.FromId = fromId
@@ -146,7 +146,7 @@ func (ts *TcpServer) BroadCast(id uint32, fromType uint32, fromId uint32, toType
 }
 
 func (ts *TcpServer) SendProto(sid nfcommon.SessionId, id uint32, fromType uint32, fromId uint32, toType uint32, toId uint32, data []byte) {
-	proto := &Protocol{}
+	proto := nfcommon.NewProto()
 	proto.Id = id
 	proto.FromType = fromType
 	proto.FromId = fromId
