@@ -7,12 +7,11 @@ import (
 	"io"
 	"net"
 	"nyjora-framework/nfcommon"
-
-	"github.com/golang/snappy"
 )
 
 const (
-	MSG_HEADER_SIZE = 20
+	PROTO_HEADER_SIZE = 20
+	WRITE_CACHE_SIZE  = 8
 )
 
 type Protocol struct {
@@ -29,6 +28,7 @@ type NetSession struct {
 	reader     *bufio.Reader
 	writer     *bufio.Writer
 	Id         nfcommon.SessionId
+	writeChan  chan []byte
 	compressed bool
 }
 
@@ -36,6 +36,7 @@ func NewNetSession(conn net.Conn) *NetSession {
 	s := NetSession{
 		Id:         nfcommon.NextSessionId(),
 		compressed: false,
+		writeChan:  make(chan []byte),
 	}
 	s.Reset(conn)
 	return &s
@@ -50,10 +51,10 @@ func (ns *NetSession) RemoteAddr() net.Addr {
 }
 
 func (ns *NetSession) Run() {
-	// read loop
-	ns.readStream()
 	// write coroutine
 	go ns.writeStream()
+	// read loop
+	ns.readStream()
 }
 
 func (ns *NetSession) readStream() {
@@ -62,26 +63,28 @@ func (ns *NetSession) readStream() {
 	}()
 	for {
 		// read length first
-		header := make([]byte, 2)
+		header := make([]byte, 4)
 		if _, err := io.ReadFull(ns.reader, header); err != nil {
 			fmt.Printf("[NetSession] readStream: Can not read header! err = %s\n", err.Error())
 			break
 		}
-		len := binary.LittleEndian.Uint16(header)
-		if len <= MSG_HEADER_SIZE {
-			fmt.Printf("[NetSession] readStream: len is too small! len = %d\n", len)
+		length := binary.LittleEndian.Uint32(header)
+		if length <= PROTO_HEADER_SIZE {
+			fmt.Printf("[NetSession] readStream: len is too small! len = %d\n", length)
 			break
 		}
 		// read package
-		pkg := make([]byte, len)
-		if _, err := io.ReadFull(ns.reader, pkg); err != nil {
+		rawData := make([]byte, length)
+		if _, err := io.ReadFull(ns.reader, rawData); err != nil {
 			fmt.Printf("[NetSession] readStream: Can not read enough data err = %s\n", err.Error())
 			break
 		}
+		// build nfbuf
+		pkg := nfcommon.NewNFBufBytes(rawData)
 		// decode
-		proto, derr := ns.decode(len, pkg)
-		if derr != nil {
-			fmt.Printf("[NetSession] readStream: Protocol decode failed !err = %s\n", derr.Error())
+		proto, err := ns.decode(length, pkg)
+		if err != nil {
+			fmt.Printf("[NetSession] readStream: Protocol decode failed !err = %s\n", err.Error())
 			break
 		}
 		// dispatch
@@ -89,31 +92,19 @@ func (ns *NetSession) readStream() {
 	}
 }
 
-func (ns *NetSession) decode(len uint16, pkg []byte) (*Protocol, error) {
+func (ns *NetSession) decode(len uint32, pkg *nfcommon.Nfbuf) (*Protocol, error) {
 	//uncompress
-	var dpkg []byte
-	var err error
 	if ns.compressed {
-		dpkg, err = snappy.Decode(nil, pkg)
-
+		err := pkg.UnCompress()
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		dpkg = pkg
 	}
-
 	// new protocol, use pool? TODO:
-	proto := Protocol{}
+	proto := &Protocol{}
 	// unmarshal data
-	proto.Id = binary.LittleEndian.Uint32(dpkg[:4])
-	proto.FromType = binary.LittleEndian.Uint32(dpkg[4:8])
-	proto.FromId = binary.LittleEndian.Uint32(dpkg[8:12])
-	proto.ToType = binary.LittleEndian.Uint32(dpkg[12:16])
-	proto.ToId = binary.LittleEndian.Uint32(dpkg[16:20])
-	proto.Data = dpkg[20:]
-
-	return &proto, nil
+	ns.UnpackProto(pkg, proto)
+	return proto, nil
 }
 
 func (ns *NetSession) dispatch(proto *Protocol) {
@@ -122,7 +113,31 @@ func (ns *NetSession) dispatch(proto *Protocol) {
 }
 
 func (ns *NetSession) writeStream() {
+	for {
+		rawData := <-ns.writeChan
+		// 发送
+		if rawData == nil {
+			continue
+		}
+		left := len(rawData)
+		fmt.Printf("[NetSession] writeStream left = %d\n", left)
+		for left > 0 {
+			n, err := ns.conn.Write(rawData)
+			if n == left && err == nil {
+				break
+			}
 
+			if n > 0 {
+				rawData = rawData[n:]
+				left -= n
+			}
+
+			if err != nil {
+				fmt.Printf("[NetSession] writeStream err = %s\n", err.Error())
+				break
+			}
+		}
+	}
 }
 
 func (ns *NetSession) Close() {
@@ -140,5 +155,36 @@ func (ns *NetSession) Reset(conn net.Conn) {
 }
 
 func (ns *NetSession) testEcho(proto *Protocol) {
-	fmt.Printf("[TestEcho] %s: %d, %d, %d, %d, %d, %s\n", ns.RemoteAddr(), proto.Id, proto.FromType, proto.FromId, proto.ToType, proto.ToId)
+	fmt.Printf("[TestEcho] %s: %d, %d, %d, %d, %d, %s\n", ns.RemoteAddr(), proto.Id, proto.FromType, proto.FromId, proto.ToType, proto.ToId, proto.Data)
+}
+
+func (ns *NetSession) UnpackProto(nb *nfcommon.Nfbuf, proto *Protocol) {
+	nb.Pop(&proto.Id).Pop(&proto.FromType).Pop(&proto.FromId).Pop(&proto.ToType).Pop(&proto.ToId)
+	proto.Data = make([]byte, nb.Len())
+	nb.Pop(proto.Data)
+}
+
+func (ns *NetSession) PackProto(nb *nfcommon.Nfbuf, proto *Protocol) {
+	nb.Push(proto.Id).Push(proto.FromType).Push(proto.FromId).Push(proto.ToType).Push(proto.ToId)
+	nb.Push(proto.Data)
+}
+
+func (ns *NetSession) Send(proto *Protocol) {
+	// encode
+	pkg := nfcommon.NewNFBuf()
+	ns.PackProto(pkg, proto)
+
+	// compress
+	if ns.compressed {
+		err := pkg.Compress()
+		if err != nil {
+			fmt.Printf("[NetSession] Send err = %s\n", err.Error())
+			return
+		}
+	}
+	// add len
+	rawData := nfcommon.NewNFBuf()
+	rawData.Push(pkg.Len()).Push(pkg.Bytes())
+	// send to write loop
+	ns.writeChan <- rawData.Bytes()
 }

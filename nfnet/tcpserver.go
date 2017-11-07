@@ -15,6 +15,30 @@ import (
 	"sync"
 )
 
+// check err whether is a net error TODO:
+func IsNetError(_err interface{}) bool {
+	err, ok := _err.(error)
+	if !ok {
+		return false
+	}
+
+	/*
+		err = errors.Cause(err)
+		if err == io.EOF {
+			return true
+		}
+	*/
+	neterr, ok := err.(net.Error)
+	if !ok {
+		return false
+	}
+	if neterr.Timeout() {
+		return false
+	}
+
+	return true
+}
+
 type ServerDelegate interface {
 	OnAddSession(nfcommon.SessionId)
 	OnDelSession(nfcommon.SessionId)
@@ -104,26 +128,10 @@ func (ts *TcpServer) Run() error {
 	}
 }
 
-// check err whether is a net error TODO:
-func IsNetError(_err interface{}) bool {
-	err, ok := _err.(error)
-	if !ok {
-		return false
-	}
+func (ts *TcpServer) BroadCast(proto *Protocol) {
 
-	/*
-		err = errors.Cause(err)
-		if err == io.EOF {
-			return true
-		}
-	*/
-	neterr, ok := err.(net.Error)
-	if !ok {
-		return false
-	}
-	if neterr.Timeout() {
-		return false
-	}
+}
 
-	return true
+func (ts *TcpServer) SendProto(sid nfcommon.SessionId, proto *Protocol) {
+
 }
