@@ -128,10 +128,35 @@ func (ts *TcpServer) Run() error {
 	}
 }
 
-func (ts *TcpServer) BroadCast(proto *Protocol) {
-
+func (ts *TcpServer) BroadCast(id uint32, fromType uint32, fromId uint32, toType uint32, toId uint32, data []byte) {
+	proto := &Protocol{}
+	proto.Id = id
+	proto.FromType = fromType
+	proto.FromId = fromId
+	proto.ToType = toType
+	proto.ToId = toId
+	proto.Data = data
+	ts.mutex.Lock()
+	defer ts.mutex.Unlock()
+	for _, v := range ts.sessionMap {
+		if v != nil {
+			v.Send(proto)
+		}
+	}
 }
 
-func (ts *TcpServer) SendProto(sid nfcommon.SessionId, proto *Protocol) {
-
+func (ts *TcpServer) SendProto(sid nfcommon.SessionId, id uint32, fromType uint32, fromId uint32, toType uint32, toId uint32, data []byte) {
+	proto := &Protocol{}
+	proto.Id = id
+	proto.FromType = fromType
+	proto.FromId = fromId
+	proto.ToType = toType
+	proto.ToId = toId
+	proto.Data = data
+	ts.mutex.Lock()
+	defer ts.mutex.Unlock()
+	session := ts.sessionMap[sid]
+	if session != nil {
+		session.Send(proto)
+	}
 }

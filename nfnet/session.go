@@ -3,6 +3,7 @@ package nfnet
 import (
 	"bufio"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -36,7 +37,7 @@ func NewNetSession(conn net.Conn) *NetSession {
 	s := NetSession{
 		Id:         nfcommon.NextSessionId(),
 		compressed: false,
-		writeChan:  make(chan []byte),
+		writeChan:  make(chan []byte, WRITE_CACHE_SIZE),
 	}
 	s.Reset(conn)
 	return &s
@@ -186,5 +187,10 @@ func (ns *NetSession) Send(proto *Protocol) {
 	rawData := nfcommon.NewNFBuf()
 	rawData.Push(pkg.Len()).Push(pkg.Bytes())
 	// send to write loop
-	ns.writeChan <- rawData.Bytes()
+	select {
+	case ns.writeChan <- rawData.Bytes()
+	default:
+		fmt.Println("[NetSession] Send writeChan cache full!")
+		return 
+	}
 }
