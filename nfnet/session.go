@@ -18,14 +18,17 @@ const (
 	PAYLOAD_COMPRESSED_MASK = 0x10000000
 )
 
-var TestRpc func(proto *nfcommon.Protocol, session *NetSession)
+type ReadHandler interface {
+	HandleProtocol(s *NetSession, p *nfcommon.Protocol)
+}
 
 type NetSession struct {
-	conn      net.Conn
-	reader    *bufio.Reader
-	writer    *bufio.Writer
-	Id        nfcommon.SessionId
-	writeChan chan []byte
+	conn        net.Conn
+	reader      *bufio.Reader
+	writer      *bufio.Writer
+	Id          nfcommon.SessionId
+	writeChan   chan []byte
+	readHandler ReadHandler
 }
 
 func NewNetSession(conn net.Conn) *NetSession {
@@ -85,7 +88,7 @@ func (ns *NetSession) readStream() {
 			break
 		}
 		// dispatch
-		ns.dispatch(proto)
+		ns.readHandler.HandleProtocol(ns, proto)
 	}
 }
 
@@ -123,11 +126,6 @@ func (ns *NetSession) encode(proto *nfcommon.Protocol) *nfcommon.Nfbuf {
 	}
 	rawData.Push(pkg.Len() & 0x0FFFFFFF).Push(pkg.Bytes())
 	return rawData
-}
-
-func (ns *NetSession) dispatch(proto *nfcommon.Protocol) {
-	// notify rpc module
-	TestRpc(proto, ns)
 }
 
 func (ns *NetSession) writeStream() {
@@ -192,4 +190,8 @@ func (ns *NetSession) Send(proto *nfcommon.Protocol) {
 		fmt.Println("[NetSession] Send writeChan cache full!")
 		return
 	}
+}
+
+func (ns *NetSession) RegisterNub(rh ReadHandler) {
+	ns.readHandler = rh
 }

@@ -40,7 +40,7 @@ func IsNetError(_err interface{}) bool {
 }
 
 type ServerDelegate interface {
-	OnAddSession(nfcommon.SessionId)
+	OnAddSession(*NetSession)
 	OnDelSession(nfcommon.SessionId)
 }
 
@@ -92,7 +92,7 @@ func (ts *TcpServer) addSession(session *NetSession) {
 	ts.mutex.Lock()
 	defer ts.mutex.Unlock()
 	ts.sessionMap[session.Id] = session
-	ts.delegate.OnAddSession(session.Id)
+	ts.delegate.OnAddSession(session)
 }
 
 func (ts *TcpServer) delSession(session *NetSession) {
