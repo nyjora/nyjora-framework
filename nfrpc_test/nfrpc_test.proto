@@ -1,0 +1,13 @@
+syntax = "proto3";
+package nfrpc_test;
+
+// general return message
+message retcode {
+	int32 ret = 1;
+}
+
+message integer {
+	int32 value = 1;
+}
+
+
