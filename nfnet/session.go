@@ -88,7 +88,9 @@ func (ns *NetSession) readStream() {
 			break
 		}
 		// dispatch
-		ns.readHandler.HandleProtocol(ns, proto)
+		if ns.readHandler != nil {
+			ns.readHandler.HandleProtocol(ns, proto)
+		}
 	}
 }
 
@@ -170,12 +172,22 @@ func (ns *NetSession) Reset(conn net.Conn) {
 }
 
 func (ns *NetSession) UnpackProto(nb *nfcommon.Nfbuf, proto *nfcommon.Protocol) {
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println(err)
+		}
+	}()
 	nb.Pop(&proto.Id).Pop(&proto.FromType).Pop(&proto.FromId).Pop(&proto.ToType).Pop(&proto.ToId)
 	proto.Data = make([]byte, nb.Len())
 	nb.Pop(proto.Data)
 }
 
 func (ns *NetSession) PackProto(nb *nfcommon.Nfbuf, proto *nfcommon.Protocol) {
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println(err)
+		}
+	}()
 	nb.Push(proto.Id).Push(proto.FromType).Push(proto.FromId).Push(proto.ToType).Push(proto.ToId)
 	nb.Push(proto.Data)
 }
