@@ -13,6 +13,11 @@ import (
 	"nyjora-framework/nfcommon"
 	"nyjora-framework/nfconst"
 	"sync"
+	"time"
+)
+
+const (
+	RESTART_TCP_SERVER_INTERVAL = 5 * time.Second
 )
 
 // check err whether is a net error TODO:
@@ -104,8 +109,16 @@ func (ts *TcpServer) delSession(session *NetSession) {
 	ts.delegate.OnDelSession(session.Id)
 }
 
+func (ts *TcpServer) RunForever() {
+	for {
+		err := ts.RunOnce()
+		fmt.Println("server@%s:%d closed err = %s, will restart in %d seconds.\n", ts.opts.Ip, ts.opts.Port, err.Error(), RESTART_TCP_SERVER_INTERVAL)
+		time.Sleep(RESTART_TCP_SERVER_INTERVAL)
+	}
+}
+
 // open a port wait for connecting
-func (ts *TcpServer) Run() error {
+func (ts *TcpServer) RunOnce() error {
 	listenAddr := fmt.Sprintf("%s:%d", ts.opts.Ip, ts.opts.Port)
 	listener, err := net.Listen("tcp", listenAddr)
 	fmt.Printf("Listening on TCP: %s ...\n", listenAddr)

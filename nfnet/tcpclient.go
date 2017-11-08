@@ -4,6 +4,11 @@ import (
 	"fmt"
 	"net"
 	"nyjora-framework/nfcommon"
+	"time"
+)
+
+const (
+	RESTART_TCP_CLIENT_INTERVAL = 5 * time.Second
 )
 
 type ClientDelegate interface {
@@ -31,40 +36,38 @@ func NewTcpClient(opt ClientOption, d ClientDelegate) *TcpClient {
 	}
 }
 
-func (tc *TcpClient) Run() {
-	addr := fmt.Sprintf("%s:%d", tc.opts.Ip, tc.opts.Port)
-	go tc.connect(addr)
+func (tc *TcpClient) ConnectToSvr() {
+	go tc.Run()
 }
 
-func (tc *TcpClient) connect(addr string) {
-	fmt.Printf("[TcpClient] connect coroutine begin! addr = %s\n", addr)
-	defer func() {
-		if tc.session != nil {
-			tc.connected = false
-			tc.session.Close()
-			tc.session = nil
-		}
-	}()
+func (tc *TcpClient) Run() {
 	for {
-		conn, err := net.Dial("tcp", addr)
-		if err != nil {
-			fmt.Printf("[TcpClient] Connect to server failed. addr = %s\n", addr)
-			return
+		if tc.connect() {
+			tc.session.Run()
 		}
-		if conn == nil {
-			fmt.Printf("[TcpClient] conn is nil. addr = %s\n", addr)
-			return
-		}
-		if tc.session == nil {
-			tc.connected = true
-			tc.session = NewNetSession(conn)
-		} else {
-			tc.connected = false
-			tc.session.Reset(conn)
-		}
-		fmt.Printf("[TcpClient] Server connected! addr = %s\n", addr)
-		tc.session.Run()
+		time.Sleep(RESTART_TCP_CLIENT_INTERVAL)
 	}
+}
+
+func (tc *TcpClient) connect() bool {
+	addr := fmt.Sprintf("%s:%d", tc.opts.Ip, tc.opts.Port)
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		fmt.Printf("[TcpClient] Connect to server failed. addr = %s\n", addr)
+		return false
+	}
+	if conn == nil {
+		fmt.Printf("[TcpClient] conn is nil. addr = %s\n", addr)
+		return false
+	}
+	tc.connected = true
+	if tc.session == nil {
+		tc.session = NewNetSession(conn)
+	} else {
+		tc.session.Reset(conn)
+	}
+	fmt.Printf("[TcpClient] Server connected! addr = %s\n", addr)
+	return true
 }
 
 func (tc *TcpClient) SendProto(id uint32, fromType uint32, fromId uint32, toType uint32, toId uint32, data []byte) {
