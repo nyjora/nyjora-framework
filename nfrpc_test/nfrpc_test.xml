@@ -3,7 +3,7 @@
 <root namespace="GNET" namespace_msg="PB">
 	<go.import pkg="github.com/golang/protobuf"/>
 
-	<interface name="Hello">
+	<service name="Hello">
 		<go.import pkg="github.com/golang/protobuf"/>
 
 		message is sinple directional.
@@ -13,22 +13,22 @@
 		arg: PB type as argument type
 		res: PB type as reply type (only for request)
 		reliable: need reliablity
-		async: generate asynchronous interface or not
+		async: generate asynchronous service or not
 		timeout: timeout in seconds
 
 		<message name="move" type="1" arg="pos" reliable="true"/>
 		<request name="cipher" type="2" arg="input" res="output" reliable="true" async="false" timeout="60"/>
-	</interface>
+	</service>
 
 </root>
 -->
 <root go.package="nfrpc_test" go.proto_package="nfrpc_test">
 	<go.import pkg="nfrpc"/>
 
-	<interface name="World">
+	<service name="World">
 
 		<message name="hello" type="1" arg="Integer" reliable="true"/>
 		<request name="ping" type="2" arg="Integer" res="Integer" reliable="true" async="false" timeout="60"/>
 		<request name="ping2" type="3" arg="Integer" res="Integer" reliable="true" async="true" timeout="60"/>
-	</interface>
+	</service>
 </root>

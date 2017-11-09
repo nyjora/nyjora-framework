@@ -13,7 +13,7 @@ MAX_METHOD_TYPE = 8912
 class ParseError(RuntimeError):
 	pass
 
-class Interface(object):
+class Service(object):
 	def __init__(self):
 		self.name = ""
 		self.methods = []
@@ -24,7 +24,7 @@ class Interface(object):
 		self.go_private_imports = []
 	
 	def __str__(self):
-		buf = "interface: name=%s\n" % self.name
+		buf = "service: name=%s\n" % self.name
 		for m in self.methods:
 			buf += str(m)
 		return buf
@@ -45,21 +45,21 @@ class Method(object):
 				("request" if self.is_request else "message", self.name, self.type, \
 				 self.arg, self.reliable, self.async)
 
-class InterfaceParser(object):
+class ServiceParser(object):
 	def __init__(self, verbose):
 		self._tree = None
-		self._interfaces = []
+		self._services = []
 		self._verbose = verbose
 		self._go_package = ""
 		self._go_proto_package = ""
 		self._go_imports = []
 	
 	def getResult(self):
-		return self._interfaces
+		return self._services
 	
 	def printResult(self):
-		for interface in self._interfaces:
-			print interface
+		for service in self._services:
+			print service
 
 	def parse(self, filename):
 		tree = ET.parse(filename)
@@ -68,29 +68,29 @@ class InterfaceParser(object):
 		for i in tree.getroot().iterfind("go.import"):
 			self._go_imports.append(i.attrib["pkg"])
 
-		for intNode in tree.getroot().iterfind("interface"):
-			self._interfaces.append(self.parseInterface(intNode))
+		for intNode in tree.getroot().iterfind("service"):
+			self._services.append(self.parseService(intNode))
 
 		if self._verbose:
 			self.printResult();
 
-	def parseInterface(self, intNode):
-		interface = Interface()
-		self._cur_interface = interface
-		interface.name = intNode.attrib["name"]
-		interface.go_package = self._go_package
-		interface.go_imports = self._go_imports
-		interface.go_proto_package = self._go_proto_package
+	def parseService(self, intNode):
+		service = Service()
+		self._cur_service = service
+		service.name = intNode.attrib["name"]
+		service.go_package = self._go_package
+		service.go_imports = self._go_imports
+		service.go_proto_package = self._go_proto_package
 		for i in intNode.iterfind("go.import"):
-			interface.go_private_imports.append(i.attrib["pkg"])
+			service.go_private_imports.append(i.attrib["pkg"])
 		
 		for metNode in intNode.iter():
 			# parse methods
 			method = self.parseMethod(metNode)
 			if method is not None:
-				interface.methods.append(method)
+				service.methods.append(method)
 
-		return interface
+		return service
 	
 	def parseMethod(self, metNode):
 		if metNode.tag not in ["message", "request"]:
@@ -103,13 +103,13 @@ class InterfaceParser(object):
 			method.arg = metNode.attrib["arg"]
 			method.type = int(metNode.attrib["type"])
 	
-			if method.type in self._cur_interface.method_types:
+			if method.type in self._cur_service.method_types:
 				raise ParseError("duplicated method type %d" % method.type)
-			self._cur_interface.method_types.add(method.type)
+			self._cur_service.method_types.add(method.type)
 	
-			if method.name in self._cur_interface.method_names:
+			if method.name in self._cur_service.method_names:
 				raise ParseError("duplicated method name %s" % method.name)
-			self._cur_interface.method_names.add(method.name)
+			self._cur_service.method_names.add(method.name)
 	
 			if method.type <= 0 or method.type > MAX_METHOD_TYPE:
 				raise ParseError("method type must be between 1 and %d: " % MAX_METHOD_TYPE)
@@ -136,7 +136,7 @@ class InterfaceParser(object):
 
 		return method
 
-class InterfaceCompilerGo:
+class ServiceCompilerGo:
 	def __init__(self):
 		self._env = jinja2.Environment(
 			loader = jinja2.FileSystemLoader(os.path.dirname(__file__) + "/template"),
@@ -148,17 +148,18 @@ class InterfaceCompilerGo:
 		})
 		self._template_map = {
 			"interface.go": "interface.go.jinja2",
+			"dispatcher.go": "dispatcher.go.jinja2"
 		}
 
-	def compile(self, interfaces, directory):
-		for interface in interfaces:
-			self.compileTemplateFor(directory, interface)
+	def compile(self, services, directory):
+		for service in services:
+			self.compileTemplateFor(directory, service)
 	
-	def compileTemplateFor(self, directory, interface):
+	def compileTemplateFor(self, directory, service):
 		for (source, templatename) in self._template_map.iteritems():
 			templ = self._env.get_template(templatename)
-			content = templ.render(interface.__dict__)
-			f = open(directory + os.sep + interface.name.lower() + "_" + source, "w+")
+			content = templ.render(service.__dict__)
+			f = open(directory + os.sep + service.name.lower() + "_" + source, "w+")
 			f.write(content.encode("UTF-8"))
 	
 	@staticmethod
@@ -175,16 +176,16 @@ def main():
 	optparser.add_option("-v", "--verbose", dest="verbose",
 			help="print a lot", action="store_true", default=False)
 
-	optparser.usage = "%prog <path-to-interface.xml> [options]"
+	optparser.usage = "%prog <path-to-service.xml> [options]"
 
 	(options, args) = optparser.parse_args()
 
-	parser = InterfaceParser(options.verbose)
+	parser = ServiceParser(options.verbose)
 	for f in args:
 		parser.parse(f)
 	
 	if options.go_out:
-		compiler = InterfaceCompilerGo()
+		compiler = ServiceCompilerGo()
 		compiler.compile(parser.getResult(), options.go_out)
 
 if __name__ == "__main__":
