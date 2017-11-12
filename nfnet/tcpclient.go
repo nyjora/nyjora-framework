@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"nyjora-framework/nfcommon"
+	"sync"
 	"time"
 )
 
@@ -26,6 +27,7 @@ type TcpClient struct {
 	session   *NetSession
 	delegate  ClientDelegate
 	connected bool
+	wg        *sync.WaitGroup
 }
 
 func NewTcpClient(opt ClientOption, d ClientDelegate) *TcpClient {
@@ -33,6 +35,7 @@ func NewTcpClient(opt ClientOption, d ClientDelegate) *TcpClient {
 		opts:      opt,
 		delegate:  d,
 		connected: false,
+		wg:        &sync.WaitGroup{},
 	}
 }
 
@@ -43,7 +46,7 @@ func (tc *TcpClient) ConnectToSvr() {
 func (tc *TcpClient) Run() {
 	for {
 		if tc.connect() {
-			tc.session.Run()
+			tc.session.Run(tc.wg)
 		}
 		time.Sleep(RESTART_TCP_CLIENT_INTERVAL)
 	}
@@ -89,4 +92,8 @@ func (tc *TcpClient) IsValid() bool {
 		return false
 	}
 	return true
+}
+
+func (tc *TcpClient) Stop() {
+	tc.wg.Wait()
 }

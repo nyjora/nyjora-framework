@@ -2,11 +2,13 @@ package nfnet
 
 import (
 	"bufio"
+	"context"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"net"
 	"nyjora-framework/nfcommon"
+	"sync"
 
 	"github.com/golang/snappy"
 )
@@ -29,6 +31,8 @@ type NetSession struct {
 	Id          nfcommon.SessionId
 	writeChan   chan []byte
 	readHandler ReadHandler
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 func NewNetSession(conn net.Conn) *NetSession {
@@ -36,6 +40,7 @@ func NewNetSession(conn net.Conn) *NetSession {
 		Id:        nfcommon.NextSessionId(),
 		writeChan: make(chan []byte, WRITE_CACHE_SIZE),
 	}
+	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.Reset(conn)
 	return &s
 }
@@ -48,17 +53,20 @@ func (ns *NetSession) RemoteAddr() net.Addr {
 	return ns.conn.RemoteAddr()
 }
 
-func (ns *NetSession) Run() {
+func (ns *NetSession) Run(wg *sync.WaitGroup) {
 	// write coroutine
-	go ns.writeStream()
+	go ns.writeStream(wg)
 	// read loop
-	ns.readStream()
+	ns.readStream(wg)
 }
 
-func (ns *NetSession) readStream() {
+func (ns *NetSession) readStream(wg *sync.WaitGroup) {
 	defer func() {
+		fmt.Println("[NetSession] readStream defer func.")
 		ns.Close()
+		wg.Done()
 	}()
+	wg.Add(1)
 	for {
 		// read length first
 		header := make([]byte, 4)
@@ -90,6 +98,45 @@ func (ns *NetSession) readStream() {
 		// dispatch
 		if ns.readHandler != nil {
 			ns.readHandler.HandleProtocol(ns, proto)
+		}
+
+	}
+}
+
+func (ns *NetSession) writeStream(wg *sync.WaitGroup) {
+	fmt.Println("[NetSession] writeStream begin.")
+	wg.Add(1)
+	defer func() {
+		fmt.Println("[NetSession] writeStream defer func.")
+		wg.Done()
+	}()
+	for {
+		select {
+		case <-ns.ctx.Done():
+			fmt.Println("[NetSession] writeStream ctx.Done().")
+			return
+		case rawData := <-ns.writeChan:
+			// 发送
+			if rawData == nil {
+				continue
+			}
+			left := len(rawData)
+			for left > 0 {
+				n, err := ns.conn.Write(rawData)
+				if n == left && err == nil {
+					break
+				}
+
+				if n > 0 {
+					rawData = rawData[n:]
+					left -= n
+				}
+
+				if err != nil {
+					fmt.Printf("[NetSession] writeStream err = %s\n", err.Error())
+					break
+				}
+			}
 		}
 	}
 }
@@ -130,39 +177,15 @@ func (ns *NetSession) encode(proto *nfcommon.Protocol) *nfcommon.Nfbuf {
 	return rawData
 }
 
-func (ns *NetSession) writeStream() {
-	for {
-		rawData := <-ns.writeChan
-		// 发送
-		if rawData == nil {
-			continue
-		}
-		left := len(rawData)
-		for left > 0 {
-			n, err := ns.conn.Write(rawData)
-			if n == left && err == nil {
-				break
-			}
-
-			if n > 0 {
-				rawData = rawData[n:]
-				left -= n
-			}
-
-			if err != nil {
-				fmt.Printf("[NetSession] writeStream err = %s\n", err.Error())
-				break
-			}
-		}
-	}
-}
-
 func (ns *NetSession) Close() {
+	fmt.Println("[NetSession] Close.")
 	if err := recover(); err != nil && !IsNetError(err.(error)) {
 		fmt.Printf("[NetSession] %s error : %s\n", ns.String(), err.(error))
 	} else {
 		fmt.Printf("[NetSession] %s disconnected.\n", ns.String())
 	}
+	ns.conn.Close()
+	ns.cancel()
 }
 
 func (ns *NetSession) Reset(conn net.Conn) {
