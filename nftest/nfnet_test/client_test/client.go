@@ -6,6 +6,9 @@ import (
 	"nyjora-framework/nfconf"
 	"nyjora-framework/nfnet"
 	"os"
+	"os/signal"
+	"sync"
+	"syscall"
 	"time"
 )
 
@@ -27,11 +30,18 @@ func (tcd *GDeliveryClient) OnDelSession(id nfcommon.SessionId) {
 	fmt.Printf("[OnDelSession] Session = %d\n", id)
 }
 
-func (tcd *GDeliveryClient) Connect() {
+func (tcd *GDeliveryClient) Connect(wg *sync.WaitGroup) {
 	if tcd.client != nil {
-		tcd.client.Run()
+		tcd.client.Run(wg)
 	}
 }
+
+func ExitFunc() {
+	wg.Wait()
+	os.Exit(0)
+}
+
+var wg *sync.WaitGroup
 
 func main() {
 	fmt.Println("client begin...")
@@ -50,8 +60,25 @@ func main() {
 		Ip:   nfconf.Conf.Get("clientconfig").Get("ip").MustString(),
 		Port: nfconf.Conf.Get("clientconfig").Get("port").MustInt(),
 	}
+	wg = &sync.WaitGroup{}
 	gdeliveryClient := NewGDeliveryClient(clientOpt)
-	gdeliveryClient.Connect()
+	gdeliveryClient.Connect(wg)
+
+	c := make(chan os.Signal)
+	signal.Notify(c, syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGUSR1, syscall.SIGUSR2)
+	go func() {
+		for s := range c {
+			switch s {
+			case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
+				fmt.Println("[server.go] Exit.")
+				gdeliveryClient.client.Stop(wg)
+				ExitFunc()
+			default:
+				fmt.Println("[server.go] default signal.")
+			}
+		}
+	}()
+
 	for {
 		time.Sleep(time.Second * 5)
 	}

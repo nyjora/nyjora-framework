@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 )
 
 // 用于测试的server
@@ -67,7 +66,7 @@ func main() {
 			switch s {
 			case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
 				fmt.Println("[server.go] Exit.")
-				gdeliveryService.server.Stop(wg)
+				gdeliveryService.server.Stop()
 				ExitFunc()
 			default:
 				fmt.Println("[server.go] default signal.")
@@ -76,11 +75,13 @@ func main() {
 	}()
 
 	for {
-		time.Sleep(time.Second * 10)
-		fmt.Println("[server.go] Stop.")
-		gdeliveryService.server.Stop(wg)
-		time.Sleep(time.Second * 10)
-		fmt.Println("[server.go] Serve.")
-		go gdeliveryService.server.Serve(wg)
+		/*
+			time.Sleep(time.Second * 10)
+			fmt.Println("[server.go] Stop.")
+			gdeliveryService.server.Stop()
+			time.Sleep(time.Second * 10)
+			fmt.Println("[server.go] Serve.")
+			go gdeliveryService.server.Serve(wg)
+		*/
 	}
 }

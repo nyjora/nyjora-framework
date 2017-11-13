@@ -40,7 +40,6 @@ func NewNetSession(conn net.Conn) *NetSession {
 		Id:        nfcommon.NextSessionId(),
 		writeChan: make(chan []byte, WRITE_CACHE_SIZE),
 	}
-	s.ctx, s.cancel = context.WithCancel(context.Background())
 	s.Reset(conn)
 	return &s
 }
@@ -192,6 +191,7 @@ func (ns *NetSession) Reset(conn net.Conn) {
 	ns.conn = conn
 	ns.reader = bufio.NewReader(conn)
 	ns.writer = bufio.NewWriter(conn)
+	ns.ctx, ns.cancel = context.WithCancel(context.Background())
 }
 
 func (ns *NetSession) UnpackProto(nb *nfcommon.Nfbuf, proto *nfcommon.Protocol) {

@@ -113,7 +113,6 @@ func (ts *TcpServer) delSession(session *NetSession) {
 }
 
 func (ts *TcpServer) Serve(wg *sync.WaitGroup) {
-	wg.Add(1)
 	listenAddr := fmt.Sprintf("%s:%d", ts.opts.Ip, ts.opts.Port)
 	l, err := net.Listen("tcp", listenAddr)
 	fmt.Printf("[TcpServer] Server : listening on TCP: %s ...\n", listenAddr)
@@ -122,6 +121,7 @@ func (ts *TcpServer) Serve(wg *sync.WaitGroup) {
 		return
 	}
 	ts.listener = l
+	wg.Add(1)
 	defer func() {
 		fmt.Println("[TcpServer] Serve defer func.")
 		ts.Close(wg)
@@ -184,7 +184,7 @@ func (ts *TcpServer) SendProto(sid nfcommon.SessionId, id uint32, fromType uint3
 	}
 }
 
-func (ts *TcpServer) Stop(wg *sync.WaitGroup) {
+func (ts *TcpServer) Stop() {
 	// break accept loop
 	fmt.Println("[TcpServer] Stop")
 	ts.listener.Close()

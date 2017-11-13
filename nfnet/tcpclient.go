@@ -39,20 +39,16 @@ func NewTcpClient(opt ClientOption, d ClientDelegate) *TcpClient {
 	}
 }
 
-func (tc *TcpClient) ConnectToSvr() {
-	go tc.Run()
-}
-
-func (tc *TcpClient) Run() {
+func (tc *TcpClient) Run(wg *sync.WaitGroup) {
 	for {
-		if tc.connect() {
+		if tc.connect(wg) {
 			tc.session.Run(tc.wg)
 		}
 		time.Sleep(RESTART_TCP_CLIENT_INTERVAL)
 	}
 }
 
-func (tc *TcpClient) connect() bool {
+func (tc *TcpClient) connect(wg *sync.WaitGroup) bool {
 	addr := fmt.Sprintf("%s:%d", tc.opts.Ip, tc.opts.Port)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
@@ -63,10 +59,12 @@ func (tc *TcpClient) connect() bool {
 		fmt.Printf("[TcpClient] conn is nil. addr = %s\n", addr)
 		return false
 	}
+	wg.Add(1)
 	tc.connected = true
 	if tc.session == nil {
 		tc.session = NewNetSession(conn)
 	} else {
+		// reconnect
 		tc.session.Reset(conn)
 	}
 	fmt.Printf("[TcpClient] Server connected! addr = %s\n", addr)
@@ -94,6 +92,8 @@ func (tc *TcpClient) IsValid() bool {
 	return true
 }
 
-func (tc *TcpClient) Stop() {
+func (tc *TcpClient) Stop(wg *sync.WaitGroup) {
+	tc.session.Close()
 	tc.wg.Wait()
+	wg.Done()
 }
