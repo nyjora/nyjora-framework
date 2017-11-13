@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"sync"
 )
 
 const (
@@ -12,20 +13,31 @@ const (
 	PANIC_POP                 = "[nfcommon] nfbuf.Pop unmarshal panic."
 )
 
+var buffPool = &sync.Pool{
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
+}
+
 type Nfbuf struct {
 	buf *bytes.Buffer
 }
 
 func NewNFBuf() *Nfbuf {
 	return &Nfbuf{
+		buf: buffPool.Get().(*bytes.Buffer),
+	}
+}
+
+func NewNFBufNoPool() *Nfbuf {
+	return &Nfbuf{
 		buf: new(bytes.Buffer),
 	}
 }
 
-func NewNFBufBytes(buf []byte) *Nfbuf {
-	return &Nfbuf{
-		buf: bytes.NewBuffer(buf),
-	}
+func FreeNFBuf(nf *Nfbuf) {
+	nf.buf.Reset()
+	buffPool.Put(nf)
 }
 
 func (nb *Nfbuf) Push(val interface{}) *Nfbuf {

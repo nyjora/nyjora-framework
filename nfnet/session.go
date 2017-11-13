@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"nyjora-framework/nfcommon"
+	"runtime/debug"
 	"sync"
 
 	"github.com/golang/snappy"
@@ -89,10 +90,12 @@ func (ns *NetSession) readStream(wg *sync.WaitGroup) {
 			continue
 		}
 		// build nfbuf
-		pkg := nfcommon.NewNFBufBytes(rawData)
+		pkg := nfcommon.NewNFBuf()
+		pkg.Push(rawData)
 		// decode
 		compressed := (uint32(headerInt&PAYLOAD_COMPRESSED_MASK) != 0)
 		proto, err := ns.decode(length, pkg, compressed)
+		nfcommon.FreeNFBuf(pkg)
 		if err != nil {
 			fmt.Printf("[NetSession] readStream: Protocol decode failed. err = %s\n", err.Error())
 			continue
@@ -101,6 +104,8 @@ func (ns *NetSession) readStream(wg *sync.WaitGroup) {
 		if ns.readHandler != nil {
 			ns.readHandler.HandleProtocol(ns, proto)
 		}
+		// recycle proto here!
+		nfcommon.FreeProto(proto)
 
 	}
 }
@@ -179,11 +184,19 @@ func (ns *NetSession) decode(length uint32, pkg *nfcommon.Nfbuf, compressed bool
 	} else {
 		cbuf = pkg.Bytes()
 	}
-	apkg := nfcommon.NewNFBufBytes(cbuf)
-	// new protocol, use pool? TODO:
+	apkg := nfcommon.NewNFBuf()
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println(err)
+			debug.PrintStack()
+		}
+	}()
+	apkg.Push(cbuf)
+	// new protocol
 	proto := nfcommon.NewProto()
 	// unmarshal data
 	ns.UnpackProto(apkg, proto)
+	nfcommon.FreeNFBuf(apkg)
 	return proto, nil
 }
 
@@ -191,15 +204,22 @@ func (ns *NetSession) encode(proto *nfcommon.Protocol) *nfcommon.Nfbuf {
 	pkg := nfcommon.NewNFBuf()
 	ns.PackProto(pkg, proto)
 	cbuf := snappy.Encode(nil, pkg.Bytes())
-	rawData := nfcommon.NewNFBuf()
+	rawData := nfcommon.NewNFBufNoPool()
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Println(err)
+			debug.PrintStack()
+		}
+	}()
 	if cbuf != nil && int32(len(cbuf)) < pkg.Len() {
-		pkg = nfcommon.NewNFBufBytes(cbuf)
 		length := pkg.Len()
 		length = length&0x0FFFFFFF | PAYLOAD_COMPRESSED_MASK
-		rawData.Push(length).Push(pkg.Bytes())
+		rawData.Push(length).Push(cbuf)
 		return rawData
 	}
+
 	rawData.Push(pkg.Len() & 0x0FFFFFFF).Push(pkg.Bytes())
+	nfcommon.FreeNFBuf(pkg)
 	return rawData
 }
 
@@ -219,6 +239,7 @@ func (ns *NetSession) UnpackProto(nb *nfcommon.Nfbuf, proto *nfcommon.Protocol) 
 	defer func() {
 		if err := recover(); err != nil {
 			fmt.Println(err)
+			debug.PrintStack()
 		}
 	}()
 	nb.Pop(&proto.Id).Pop(&proto.FromType).Pop(&proto.FromId).Pop(&proto.ToType).Pop(&proto.ToId)

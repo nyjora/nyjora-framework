@@ -1,5 +1,15 @@
 package nfcommon
 
+import (
+	"sync"
+)
+
+var protocolPool = &sync.Pool{
+	New: func() interface{} {
+		return &Protocol{}
+	},
+}
+
 type Protocol struct {
 	Id       uint32
 	FromType uint32
@@ -10,5 +20,10 @@ type Protocol struct {
 }
 
 func NewProto() *Protocol {
-	return &Protocol{}
+	proto := protocolPool.Get().(*Protocol)
+	return proto
+}
+
+func FreeProto(proto *Protocol) {
+	protocolPool.Put(proto)
 }
