@@ -61,6 +61,10 @@ func (ns *NetSession) Run(wg *sync.WaitGroup) {
 
 func (ns *NetSession) readStream(wg *sync.WaitGroup) {
 	defer func() {
+		// try to recover panic
+		if err := recover(); err != nil {
+			fmt.Println("[NetSession] readStream panic: %v\n", err)
+		}
 		fmt.Println("[NetSession] readStream defer func.")
 		ns.Close()
 		wg.Done()
@@ -107,6 +111,35 @@ func (ns *NetSession) writeStream(wg *sync.WaitGroup) {
 	wg.Add(1)
 	defer func() {
 		fmt.Println("[NetSession] writeStream defer func.")
+		// try to drain all data
+	OutterLoop:
+		for {
+			select {
+			case rawData := <-ns.writeChan:
+				if rawData != nil {
+					left := len(rawData)
+					for left > 0 {
+						n, err := ns.conn.Write(rawData)
+						if n == left && err == nil {
+							break
+						}
+
+						if n > 0 {
+							rawData = rawData[n:]
+							left -= n
+						}
+
+						if err != nil {
+							fmt.Printf("[NetSession] writeStream err = %s\n", err.Error())
+							break
+						}
+					}
+				}
+			default:
+				break OutterLoop
+			}
+		}
+		ns.conn.Close()
 		wg.Done()
 	}()
 	for {
@@ -178,12 +211,11 @@ func (ns *NetSession) encode(proto *nfcommon.Protocol) *nfcommon.Nfbuf {
 
 func (ns *NetSession) Close() {
 	fmt.Println("[NetSession] Close.")
-	if err := recover(); err != nil && !IsNetError(err.(error)) {
+	if err := recover(); err != nil {
 		fmt.Printf("[NetSession] %s error : %s\n", ns.String(), err.(error))
 	} else {
 		fmt.Printf("[NetSession] %s disconnected.\n", ns.String())
 	}
-	ns.conn.Close()
 	ns.cancel()
 }
 

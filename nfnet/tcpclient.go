@@ -10,6 +10,8 @@ import (
 
 const (
 	RESTART_TCP_CLIENT_INTERVAL = 5 * time.Second
+	STREAM_WRITE_BUFFER_SIZE    = 1048576
+	STREAM_READ_BUFFER_SIZE     = 1048576
 )
 
 type ClientDelegate interface {
