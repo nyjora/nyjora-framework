@@ -25,5 +25,6 @@ func NewProto() *Protocol {
 }
 
 func FreeProto(proto *Protocol) {
+	proto.Data = nil
 	protocolPool.Put(proto)
 }
