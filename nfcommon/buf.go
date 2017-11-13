@@ -67,11 +67,3 @@ func (nb *Nfbuf) Len() int32 {
 func (nb *Nfbuf) Bytes() []byte {
 	return nb.buf.Bytes()
 }
-
-func (nb *Nfbuf) UnCompress() error {
-	return nil
-}
-
-func (nb *Nfbuf) Compress() error {
-	return nil
-}
