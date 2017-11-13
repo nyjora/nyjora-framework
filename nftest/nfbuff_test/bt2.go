@@ -7,7 +7,7 @@ import (
 
 func main() {
 	buf := nfcommon.NewNFBuf()
-	var t1 int = 1
+	var t1 int16 = 1
 	var t2 int32 = 2
 	var t3 int8 = 3
 	var t4 float32 = 4.1
@@ -24,7 +24,7 @@ func main() {
 
 	fmt.Printf("buf size = %d\n", buf.Len())
 
-	var tt1 int
+	var tt1 int16
 	var tt2 int32
 	var tt3 int8
 	var tt4 float32

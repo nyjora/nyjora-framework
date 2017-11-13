@@ -31,27 +31,7 @@ func NewNFBufBytes(buf []byte) *Nfbuf {
 func (nb *Nfbuf) Push(val interface{}) *Nfbuf {
 	var err error
 	switch val.(type) {
-	case int8:
-		err = binary.Write(nb.buf, binary.LittleEndian, val)
-	case int16:
-		err = binary.Write(nb.buf, binary.LittleEndian, val)
-	case int32:
-		err = binary.Write(nb.buf, binary.LittleEndian, val)
-	case int64:
-		err = binary.Write(nb.buf, binary.LittleEndian, val)
-	case float32:
-		err = binary.Write(nb.buf, binary.LittleEndian, val)
-	case float64:
-		err = binary.Write(nb.buf, binary.LittleEndian, val)
-	case uint:
-		err = binary.Write(nb.buf, binary.LittleEndian, val)
-	case uint8:
-		err = binary.Write(nb.buf, binary.LittleEndian, val)
-	case uint16:
-		err = binary.Write(nb.buf, binary.LittleEndian, val)
-	case uint32:
-		err = binary.Write(nb.buf, binary.LittleEndian, val)
-	case uint64:
+	case int8, int16, int32, int64, float32, float64, uint8, uint16, uint32, uint64:
 		err = binary.Write(nb.buf, binary.LittleEndian, val)
 	case []byte:
 		_, err = nb.buf.Write(val.([]byte))
@@ -67,27 +47,7 @@ func (nb *Nfbuf) Push(val interface{}) *Nfbuf {
 func (nb *Nfbuf) Pop(val interface{}) *Nfbuf {
 	var err error
 	switch val.(type) {
-	case *int8:
-		err = binary.Read(nb.buf, binary.LittleEndian, val)
-	case *int16:
-		err = binary.Read(nb.buf, binary.LittleEndian, val)
-	case *int32:
-		err = binary.Read(nb.buf, binary.LittleEndian, val)
-	case *int64:
-		err = binary.Read(nb.buf, binary.LittleEndian, val)
-	case *float32:
-		err = binary.Read(nb.buf, binary.LittleEndian, val)
-	case *float64:
-		err = binary.Read(nb.buf, binary.LittleEndian, val)
-	case *uint:
-		err = binary.Read(nb.buf, binary.LittleEndian, val)
-	case *uint8:
-		err = binary.Read(nb.buf, binary.LittleEndian, val)
-	case *uint16:
-		err = binary.Read(nb.buf, binary.LittleEndian, val)
-	case *uint32:
-		err = binary.Read(nb.buf, binary.LittleEndian, val)
-	case *uint64:
+	case *int8, *int16, *int32, *int64, *float32, *float64, *uint8, *uint16, *uint32, *uint64:
 		err = binary.Read(nb.buf, binary.LittleEndian, val)
 	case []byte:
 		_, err = nb.buf.Read(val.([]byte))
