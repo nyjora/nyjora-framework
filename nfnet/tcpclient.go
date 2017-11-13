@@ -37,13 +37,13 @@ func NewTcpClient(opt ClientOption, d ClientDelegate) *TcpClient {
 		opts:      opt,
 		delegate:  d,
 		connected: false,
-		wg:        &sync.WaitGroup{},
 	}
 }
 
 func (tc *TcpClient) Run(wg *sync.WaitGroup) {
 	for {
 		if tc.connect(wg) {
+			tc.wg = &sync.WaitGroup{}
 			tc.session.Run(tc.wg)
 		}
 		time.Sleep(RESTART_TCP_CLIENT_INTERVAL)
@@ -95,6 +95,7 @@ func (tc *TcpClient) IsValid() bool {
 }
 
 func (tc *TcpClient) Stop(wg *sync.WaitGroup) {
+	fmt.Println("[TcpClient] Stop.")
 	tc.session.Close()
 	tc.wg.Wait()
 	wg.Done()

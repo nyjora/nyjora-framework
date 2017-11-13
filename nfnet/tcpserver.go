@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"net"
 	"nyjora-framework/nfcommon"
-	"nyjora-framework/nfconst"
 	"sync"
 	"time"
 )
@@ -84,8 +83,8 @@ func NewTcpServer(opt ServerOption, d ServerDelegate) *TcpServer {
 
 func (ts *TcpServer) handleConn(conn net.Conn) {
 	tcpConn := conn.(*net.TCPConn)
-	tcpConn.SetWriteBuffer(nfconst.STREAM_WRITE_BUFFER_SIZE)
-	tcpConn.SetReadBuffer(nfconst.STREAM_READ_BUFFER_SIZE)
+	tcpConn.SetWriteBuffer(STREAM_WRITE_BUFFER_SIZE)
+	tcpConn.SetReadBuffer(STREAM_READ_BUFFER_SIZE)
 
 	ts.registerConnection(tcpConn)
 }

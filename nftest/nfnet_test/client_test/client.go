@@ -9,7 +9,6 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
-	"time"
 )
 
 type GDeliveryClient struct {
@@ -32,11 +31,12 @@ func (tcd *GDeliveryClient) OnDelSession(id nfcommon.SessionId) {
 
 func (tcd *GDeliveryClient) Connect(wg *sync.WaitGroup) {
 	if tcd.client != nil {
-		tcd.client.Run(wg)
+		go tcd.client.Run(wg)
 	}
 }
 
 func ExitFunc() {
+	fmt.Println("[ExitFunc]")
 	wg.Wait()
 	os.Exit(0)
 }
@@ -56,10 +56,12 @@ func main() {
 		fmt.Printf("[Main] conf init err! : %s\n", err)
 		os.Exit(1)
 	}
+
 	clientOpt := nfnet.ClientOption{
 		Ip:   nfconf.Conf.Get("clientconfig").Get("ip").MustString(),
 		Port: nfconf.Conf.Get("clientconfig").Get("port").MustInt(),
 	}
+
 	wg = &sync.WaitGroup{}
 	gdeliveryClient := NewGDeliveryClient(clientOpt)
 	gdeliveryClient.Connect(wg)
@@ -70,16 +72,16 @@ func main() {
 		for s := range c {
 			switch s {
 			case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
-				fmt.Println("[server.go] Exit.")
+				fmt.Println("[client.go] Exit.")
 				gdeliveryClient.client.Stop(wg)
 				ExitFunc()
 			default:
-				fmt.Println("[server.go] default signal.")
+				fmt.Println("[client.go] default signal.")
 			}
 		}
 	}()
 
 	for {
-		time.Sleep(time.Second * 5)
+
 	}
 }

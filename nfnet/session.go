@@ -53,20 +53,19 @@ func (ns *NetSession) RemoteAddr() net.Addr {
 }
 
 func (ns *NetSession) Run(wg *sync.WaitGroup) {
-	// write coroutine
-	go ns.writeStream(wg)
 	// read loop
-	ns.readStream(wg)
+	go ns.readStream(wg)
+	// write coroutine
+	ns.writeStream(wg)
+
 }
 
 func (ns *NetSession) readStream(wg *sync.WaitGroup) {
 	defer func() {
-		// try to recover panic
 		if err := recover(); err != nil {
-			fmt.Println("[NetSession] readStream panic: %v\n", err)
+			fmt.Printf("[NetSession] %s panic err : %s\n", ns.String(), err.(error))
 		}
-		fmt.Println("[NetSession] readStream defer func.")
-		ns.Close()
+		ns.cancel()
 		wg.Done()
 	}()
 	wg.Add(1)
@@ -81,13 +80,13 @@ func (ns *NetSession) readStream(wg *sync.WaitGroup) {
 		length := uint32(headerInt & PAYLOAD_LEN_MASK)
 		if length <= PROTO_HEADER_SIZE {
 			fmt.Printf("[NetSession] readStream: len is too small. len = %d\n", length)
-			break
+			continue
 		}
 		// read package
 		rawData := make([]byte, length)
 		if _, err := io.ReadFull(ns.reader, rawData); err != nil {
 			fmt.Printf("[NetSession] readStream: Can not read enough data. err = %s\n", err.Error())
-			break
+			continue
 		}
 		// build nfbuf
 		pkg := nfcommon.NewNFBufBytes(rawData)
@@ -96,7 +95,7 @@ func (ns *NetSession) readStream(wg *sync.WaitGroup) {
 		proto, err := ns.decode(length, pkg, compressed)
 		if err != nil {
 			fmt.Printf("[NetSession] readStream: Protocol decode failed. err = %s\n", err.Error())
-			break
+			continue
 		}
 		// dispatch
 		if ns.readHandler != nil {
@@ -111,28 +110,17 @@ func (ns *NetSession) writeStream(wg *sync.WaitGroup) {
 	wg.Add(1)
 	defer func() {
 		fmt.Println("[NetSession] writeStream defer func.")
+		if err := recover(); err != nil {
+			fmt.Printf("[NetSession] %s panic err : %s\n", ns.String(), err.(error))
+		}
 		// try to drain all data
 	OutterLoop:
 		for {
 			select {
 			case rawData := <-ns.writeChan:
 				if rawData != nil {
-					left := len(rawData)
-					for left > 0 {
-						n, err := ns.conn.Write(rawData)
-						if n == left && err == nil {
-							break
-						}
-
-						if n > 0 {
-							rawData = rawData[n:]
-							left -= n
-						}
-
-						if err != nil {
-							fmt.Printf("[NetSession] writeStream err = %s\n", err.Error())
-							break
-						}
+					if _, err := ns.conn.Write(rawData); err != nil {
+						fmt.Printf("[NetSession] writeStream err = %s\n", err.Error())
 					}
 				}
 			default:
@@ -152,23 +140,29 @@ func (ns *NetSession) writeStream(wg *sync.WaitGroup) {
 			if rawData == nil {
 				continue
 			}
-			left := len(rawData)
-			for left > 0 {
-				n, err := ns.conn.Write(rawData)
-				if n == left && err == nil {
-					break
-				}
-
-				if n > 0 {
-					rawData = rawData[n:]
-					left -= n
-				}
-
-				if err != nil {
-					fmt.Printf("[NetSession] writeStream err = %s\n", err.Error())
-					break
-				}
+			if _, err := ns.conn.Write(rawData); err != nil {
+				fmt.Printf("[NetSession] writeStream err = %s\n", err.Error())
+				return
 			}
+			/*
+				left := len(rawData)
+				for left > 0 {
+					n, err := ns.conn.Write(rawData)
+					if n == left && err == nil {
+						break
+					}
+
+					if n > 0 {
+						rawData = rawData[n:]
+						left -= n
+					}
+
+					if err != nil {
+						fmt.Printf("[NetSession] writeStream err = %s\n", err.Error())
+						break
+					}
+				}
+			*/
 		}
 	}
 }
@@ -211,11 +205,6 @@ func (ns *NetSession) encode(proto *nfcommon.Protocol) *nfcommon.Nfbuf {
 
 func (ns *NetSession) Close() {
 	fmt.Println("[NetSession] Close.")
-	if err := recover(); err != nil {
-		fmt.Printf("[NetSession] %s error : %s\n", ns.String(), err.(error))
-	} else {
-		fmt.Printf("[NetSession] %s disconnected.\n", ns.String())
-	}
 	ns.cancel()
 }
 
