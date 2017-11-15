@@ -1,6 +1,6 @@
 package nfcommon
 
-type SessionId int32
+type SessionId int64
 
 var curSessionId SessionId = 0
 
