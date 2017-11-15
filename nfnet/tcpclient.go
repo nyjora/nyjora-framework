@@ -41,6 +41,7 @@ func NewTcpClient(opt ClientOption, d ClientDelegate) *TcpClient {
 }
 
 func (tc *TcpClient) Run(wg *sync.WaitGroup) {
+	wg.Add(1)
 	for {
 		if tc.connect(wg) {
 			tc.wg = &sync.WaitGroup{}
@@ -61,7 +62,6 @@ func (tc *TcpClient) connect(wg *sync.WaitGroup) bool {
 		fmt.Printf("[TcpClient] conn is nil. addr = %s\n", addr)
 		return false
 	}
-	wg.Add(1)
 	tc.connected = true
 	if tc.session == nil {
 		tc.session = NewNetSession(conn)
@@ -96,7 +96,10 @@ func (tc *TcpClient) IsValid() bool {
 
 func (tc *TcpClient) Stop(wg *sync.WaitGroup) {
 	fmt.Println("[TcpClient] Stop.")
-	tc.session.Close()
-	tc.wg.Wait()
+	if tc.session != nil {
+		tc.session.Close()
+		tc.session = nil
+		tc.wg.Wait()
+	}
 	wg.Done()
 }

@@ -13,8 +13,6 @@ import (
 )
 
 var DB *bolt.DB
-var Ctx context.Context
-var cancel context.CancelFunc
 var Wg *sync.WaitGroup
 var hbCron *cron.Cron
 
