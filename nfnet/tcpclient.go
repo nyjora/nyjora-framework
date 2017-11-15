@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"nyjora-framework/nfcommon"
+	"nyjora-framework/nflog"
 	"sync"
 	"time"
 )
@@ -55,11 +56,11 @@ func (tc *TcpClient) connect(wg *sync.WaitGroup) bool {
 	addr := fmt.Sprintf("%s:%d", tc.opts.Ip, tc.opts.Port)
 	conn, err := net.Dial("tcp", addr)
 	if err != nil {
-		fmt.Printf("[TcpClient] Connect to server failed. addr = %s\n", addr)
+		nflog.Err("[TcpClient] Connect to server failed. addr = %s\n", addr)
 		return false
 	}
 	if conn == nil {
-		fmt.Printf("[TcpClient] conn is nil. addr = %s\n", addr)
+		nflog.Err("[TcpClient] conn is nil. addr = %s\n", addr)
 		return false
 	}
 	tc.connected = true
@@ -69,7 +70,7 @@ func (tc *TcpClient) connect(wg *sync.WaitGroup) bool {
 		// reconnect
 		tc.session.Reset(conn)
 	}
-	fmt.Printf("[TcpClient] Server connected! addr = %s\n", addr)
+	nflog.Info("[TcpClient] Server connected! addr = %s\n", addr)
 	return true
 }
 
@@ -95,7 +96,7 @@ func (tc *TcpClient) IsValid() bool {
 }
 
 func (tc *TcpClient) Stop(wg *sync.WaitGroup) {
-	fmt.Println("[TcpClient] Stop.")
+	nflog.Debug("[TcpClient] Stop.")
 	if tc.session != nil {
 		tc.session.Close()
 		tc.session = nil

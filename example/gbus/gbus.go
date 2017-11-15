@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"nyjora-framework/example/gbus/service"
 	"nyjora-framework/nfconf"
 	"nyjora-framework/nflog"
@@ -23,7 +22,6 @@ func Exit() {
 func InitConf() {
 	if len(os.Args) < 2 {
 		nflog.Fatal("Args too short %v\n", len(os.Args))
-		//log.Fatalf("Args too short %d\n", len(os.Args))
 	}
 	filepath := os.Args[1]
 	nflog.Info("Read Json file : " + filepath)
@@ -63,12 +61,12 @@ func main() {
 		for s := range c {
 			switch s {
 			case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
-				fmt.Println("[gbus] Exit.")
+				nflog.Debug("Exit...")
 				gbus.BusServer.Stop(wg)
 				gbus.DBClient.Stop(wg)
 				Exit()
 			default:
-				fmt.Println("[gbus] default signal.")
+				nflog.Err("unknown signal.")
 			}
 		}
 	}()

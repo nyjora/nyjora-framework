@@ -1,9 +1,9 @@
 package nfdb
 
 import (
-	"context"
 	"fmt"
 	"nyjora-framework/nfconf"
+	"nyjora-framework/nflog"
 	"sync"
 	"time"
 
@@ -24,17 +24,16 @@ func Start() error {
 	var err error
 	DB, err = bolt.Open(dbpath+dbname, 0600, nil)
 	if err != nil {
-		fmt.Printf("[boltdb.go] db open fail. name = %s\n", dbpath+dbname)
+		nflog.Err("db open fail. name = %s\n", dbpath+dbname)
 		return err
 	}
 	fmt.Printf("[boltdb.go] Start. %s\n", dbpath+dbname)
 	// Initialse database tables(buckets)
 	for _, v := range dbtables {
 		err = DB.Update(func(tx *bolt.Tx) error {
-			fmt.Printf("[boltdb.go] CreateBucketIfNotExists v = %v\n", v)
 			_, err := tx.CreateBucketIfNotExists([]byte(v))
 			if err != nil {
-				fmt.Printf("[boltdb.go] create table %s fail.\n", v)
+				nflog.Err("create table %s fail.\n", v)
 				return err
 			}
 			return nil
@@ -51,15 +50,12 @@ func Start() error {
 
 	// new wg
 	Wg = &sync.WaitGroup{}
-	// context
-	Ctx, cancel = context.WithCancel(context.Background())
 	return nil
 }
 
 func Close() {
-	fmt.Println("[boltdb.go] Close.")
+	nflog.Debug("Database close...")
 	hbCron.Stop()
-	cancel()
 	Wg.Wait()
 	if DB != nil {
 		DB.Close()
@@ -71,7 +67,7 @@ func hotBackup() {
 	backup := nfconf.Conf.Get("database").Get("backup").MustString("./")
 	timestring := time.Now().Format("20060102150405")
 	if DB != nil {
-		fmt.Printf("[boltdb.go] hotbackup. %s\n", backup)
+		nflog.Info("hotbackup begin, to %s at %s\n", backup, timestring)
 		err := DB.View(func(tx *bolt.Tx) error {
 			return tx.CopyFile(backup+timestring+".dbbk", 0666)
 		})

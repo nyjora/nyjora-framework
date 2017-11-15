@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	globby "nyjora-framework/example/globby/service"
 	"nyjora-framework/nfconf"
 	"nyjora-framework/nflog"
@@ -22,15 +21,13 @@ func Exit() {
 
 func InitConf() {
 	if len(os.Args) < 2 {
-		fmt.Println("Args too short!")
-		os.Exit(1)
+		nflog.Fatal("Args too short %v\n", len(os.Args))
 	}
 	filepath := os.Args[1]
-	fmt.Println("Read Json file : " + filepath)
+	nflog.Info("Read Json file : " + filepath)
 	err := nfconf.Init(filepath)
 	if err != nil {
-		fmt.Printf("[Main] conf init err! : %s\n", err)
-		os.Exit(1)
+		nflog.Fatal("conf init err : %v\n", err)
 	}
 }
 
@@ -39,6 +36,7 @@ func InitLogger() {
 }
 
 func main() {
+	InitLogger()
 	InitConf()
 	wg = &sync.WaitGroup{}
 
@@ -55,11 +53,11 @@ func main() {
 		for s := range c {
 			switch s {
 			case syscall.SIGHUP, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT:
-				fmt.Println("[globby] Exit.")
+				nflog.Debug("Exit...")
 				globby.BusClient.Stop(wg)
 				Exit()
 			default:
-				fmt.Println("[globby] default signal.")
+				nflog.Err("unknow signal.")
 			}
 		}
 	}()

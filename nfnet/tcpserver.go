@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"net"
 	"nyjora-framework/nfcommon"
+	"nyjora-framework/nflog"
 	"sync"
 	"time"
 )
@@ -19,30 +20,6 @@ const (
 	RESTART_TCP_SERVER_INTERVAL = 5 * time.Second
 	MAX_RETRY_TIME_INTERVAL     = 5 * time.Second
 )
-
-// check err whether is a net error TODO:
-func IsNetError(_err interface{}) bool {
-	err, ok := _err.(error)
-	if !ok {
-		return false
-	}
-
-	/*
-		err = errors.Cause(err)
-		if err == io.EOF {
-			return true
-		}
-	*/
-	neterr, ok := err.(net.Error)
-	if !ok {
-		return false
-	}
-	if neterr.Timeout() {
-		return false
-	}
-
-	return true
-}
 
 type ServerDelegate interface {
 	OnAddSession(*NetSession)
@@ -114,15 +91,14 @@ func (ts *TcpServer) delSession(session *NetSession) {
 func (ts *TcpServer) Run(wg *sync.WaitGroup) {
 	listenAddr := fmt.Sprintf("%s:%d", ts.opts.Ip, ts.opts.Port)
 	l, err := net.Listen("tcp", listenAddr)
-	fmt.Printf("[TcpServer] Server : listening on TCP: %s ...\n", listenAddr)
+	nflog.Info("[TcpServer] Run: listening on TCP: %s ...\n", listenAddr)
 	if err != nil {
-		fmt.Printf("[TcpServer] Server : listen to %s err = %v\n", listenAddr, err)
+		nflog.Err("[TcpServer] Run: listen to %s err = %v\n", listenAddr, err)
 		return
 	}
 	ts.listener = l
 	wg.Add(1)
 	defer func() {
-		fmt.Println("[TcpServer] Serve defer func.")
 		ts.Close(wg)
 	}()
 	var delay time.Duration
@@ -140,14 +116,14 @@ func (ts *TcpServer) Run(wg *sync.WaitGroup) {
 				if delay > MAX_RETRY_TIME_INTERVAL {
 					delay = MAX_RETRY_TIME_INTERVAL
 				}
-				fmt.Printf("[TcpServer] Server: accept err %v, retry in %d\n", err, delay)
+				nflog.Err("[TcpServer] Server: accept err %v, retry in %d\n", err, delay)
 				select {
 				case <-time.After(delay):
-					fmt.Printf("[TcpServer] Server: time.After(%d)\n", delay)
+					nflog.Debug("[TcpServer] Server: time.After(%d)\n", delay)
 				}
 				continue
 			}
-			fmt.Printf("[TcpServer] Server: accept fatal err %v\n", err)
+			nflog.Info("[TcpServer] Server: accept closed %v\n", err)
 			return
 		}
 		delay = 0
@@ -185,12 +161,12 @@ func (ts *TcpServer) SendProto(sid nfcommon.SessionId, id uint32, fromType uint3
 
 func (ts *TcpServer) Stop(wg *sync.WaitGroup) {
 	// break accept loop
-	fmt.Println("[TcpServer] Stop")
+	nflog.Debug("[TcpServer] Stop")
 	ts.listener.Close()
 }
 
 func (ts *TcpServer) Close(wg *sync.WaitGroup) {
-	fmt.Println("[TcpServer] Close.")
+	nflog.Debug("[TcpServer] Close.")
 	// close all session
 	tsm := map[nfcommon.SessionId]*NetSession{}
 	ts.sessionMap.Range(func(k, v interface{}) bool {
@@ -206,7 +182,7 @@ func (ts *TcpServer) Close(wg *sync.WaitGroup) {
 }
 
 func (ts *TcpServer) StopSession(sid nfcommon.SessionId) {
-	fmt.Printf("[TcpServer] StopSession sid = %d\n", sid)
+	nflog.Debug("[TcpServer] StopSession sid = %d\n", sid)
 	s, ok := ts.sessionMap.Load(sid)
 	if ok {
 		s.(*NetSession).Close()

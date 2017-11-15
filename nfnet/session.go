@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"nyjora-framework/nfcommon"
+	"nyjora-framework/nflog"
 	"runtime/debug"
 	"sync"
 
@@ -64,7 +65,7 @@ func (ns *NetSession) Run(wg *sync.WaitGroup) {
 func (ns *NetSession) readStream(wg *sync.WaitGroup) {
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Printf("[NetSession] %s panic err : %s\n", ns.String(), err.(error))
+			nflog.Err("[NetSession] %s panic err : %s\n", ns.String(), err.(error))
 		}
 		ns.cancel()
 		wg.Done()
@@ -74,19 +75,19 @@ func (ns *NetSession) readStream(wg *sync.WaitGroup) {
 		// read length first
 		header := make([]byte, 4)
 		if _, err := io.ReadFull(ns.reader, header); err != nil {
-			fmt.Printf("[NetSession] readStream: Can not read header! err = %s\n", err.Error())
+			nflog.Err("[NetSession] readStream: Can not read header! err = %s\n", err.Error())
 			break
 		}
 		headerInt := binary.LittleEndian.Uint32(header)
 		length := uint32(headerInt & PAYLOAD_LEN_MASK)
 		if length <= PROTO_HEADER_SIZE {
-			fmt.Printf("[NetSession] readStream: len is too small. len = %d\n", length)
+			nflog.Err("[NetSession] readStream: len is too small. len = %d\n", length)
 			continue
 		}
 		// read package
 		rawData := make([]byte, length)
 		if _, err := io.ReadFull(ns.reader, rawData); err != nil {
-			fmt.Printf("[NetSession] readStream: Can not read enough data. err = %s\n", err.Error())
+			nflog.Err("[NetSession] readStream: Can not read enough data. err = %s\n", err.Error())
 			continue
 		}
 		// build nfbuf
@@ -97,7 +98,7 @@ func (ns *NetSession) readStream(wg *sync.WaitGroup) {
 		proto, err := ns.decode(length, pkg, compressed)
 		nfcommon.FreeNFBuf(pkg)
 		if err != nil {
-			fmt.Printf("[NetSession] readStream: Protocol decode failed. err = %s\n", err.Error())
+			nflog.Err("[NetSession] readStream: Protocol decode failed. err = %s\n", err.Error())
 			continue
 		}
 		// dispatch
@@ -111,12 +112,11 @@ func (ns *NetSession) readStream(wg *sync.WaitGroup) {
 }
 
 func (ns *NetSession) writeStream(wg *sync.WaitGroup) {
-	fmt.Println("[NetSession] writeStream begin.")
+	nflog.Debug("[NetSession] writeStream begin.")
 	wg.Add(1)
 	defer func() {
-		fmt.Println("[NetSession] writeStream defer func.")
 		if err := recover(); err != nil {
-			fmt.Printf("[NetSession] %s panic err : %s\n", ns.String(), err.(error))
+			nflog.Err("[NetSession] %s panic err : %s\n", ns.String(), err.(error))
 		}
 		// try to drain all data
 	OutterLoop:
@@ -125,7 +125,7 @@ func (ns *NetSession) writeStream(wg *sync.WaitGroup) {
 			case rawData := <-ns.writeChan:
 				if rawData != nil {
 					if _, err := ns.conn.Write(rawData); err != nil {
-						fmt.Printf("[NetSession] writeStream err = %s\n", err.Error())
+						nflog.Err("[NetSession] writeStream err = %s\n", err.Error())
 					}
 				}
 			default:
@@ -138,7 +138,7 @@ func (ns *NetSession) writeStream(wg *sync.WaitGroup) {
 	for {
 		select {
 		case <-ns.ctx.Done():
-			fmt.Println("[NetSession] writeStream ctx.Done().")
+			nflog.Debug("[NetSession] writeStream ctx.Done().")
 			return
 		case rawData := <-ns.writeChan:
 			// 发送
@@ -146,7 +146,7 @@ func (ns *NetSession) writeStream(wg *sync.WaitGroup) {
 				continue
 			}
 			if _, err := ns.conn.Write(rawData); err != nil {
-				fmt.Printf("[NetSession] writeStream err = %s\n", err.Error())
+				nflog.Err("[NetSession] writeStream err = %s\n", err.Error())
 				return
 			}
 			/*
@@ -224,7 +224,7 @@ func (ns *NetSession) encode(proto *nfcommon.Protocol) *nfcommon.Nfbuf {
 }
 
 func (ns *NetSession) Close() {
-	fmt.Println("[NetSession] Close.")
+	nflog.Debug("[NetSession] Close.")
 	ns.cancel()
 }
 
@@ -264,7 +264,7 @@ func (ns *NetSession) Send(proto *nfcommon.Protocol) {
 	select {
 	case ns.writeChan <- rawData.Bytes():
 	default:
-		fmt.Println("[NetSession] Send writeChan cache full!")
+		nflog.Err("[NetSession] Send writeChan cache full!")
 		return
 	}
 }

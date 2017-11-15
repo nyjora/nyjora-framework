@@ -1,8 +1,8 @@
 package globby
 
 import (
-	"fmt"
 	"nyjora-framework/nfcommon"
+	"nyjora-framework/nflog"
 	"nyjora-framework/nfnet"
 )
 
@@ -19,9 +19,9 @@ func InitDBClient(opt nfnet.ClientOption) {
 }
 
 func (bc *BusClientDelegate) OnAddSession(id nfcommon.SessionId) {
-	fmt.Printf("[OnAddSession] Session = %d\n", id)
+	nflog.Info("[OnAddSession] Session = %d\n", id)
 }
 
 func (bc *BusClientDelegate) OnDelSession(id nfcommon.SessionId) {
-	fmt.Printf("[OnDelSession] Session = %d\n", id)
+	nflog.Info("[OnDelSession] Session = %d\n", id)
 }

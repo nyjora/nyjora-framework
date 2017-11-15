@@ -1,8 +1,8 @@
 package gdatabase
 
 import (
-	"fmt"
 	"nyjora-framework/nfcommon"
+	"nyjora-framework/nflog"
 	"nyjora-framework/nfnet"
 )
 
@@ -19,9 +19,9 @@ func InitDBServer(opt nfnet.ServerOption) {
 }
 
 func (ds *DBServerDelegate) OnAddSession(s *nfnet.NetSession) {
-	fmt.Printf("[OnAddSession] Session = %d\n", s.Id)
+	nflog.Info("[OnAddSession] Session = %d\n", s.Id)
 }
 
 func (ds *DBServerDelegate) OnDelSession(id nfcommon.SessionId) {
-	fmt.Printf("[OnDelSession] Session = %d\n", id)
+	nflog.Info("[OnDelSession] Session = %d\n", id)
 }

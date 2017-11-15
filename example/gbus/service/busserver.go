@@ -1,8 +1,8 @@
 package gbus
 
 import (
-	"fmt"
 	"nyjora-framework/nfcommon"
+	"nyjora-framework/nflog"
 	"nyjora-framework/nfnet"
 )
 
@@ -19,9 +19,9 @@ func InitBusServer(opt nfnet.ServerOption) {
 }
 
 func (bs *BusServerDelegate) OnAddSession(s *nfnet.NetSession) {
-	fmt.Printf("[OnAddSession] Session = %d\n", s.Id)
+	nflog.Info("[OnAddSession] Session = %d\n", s.Id)
 }
 
 func (bs *BusServerDelegate) OnDelSession(id nfcommon.SessionId) {
-	fmt.Printf("[OnDelSession] Session = %d\n", id)
+	nflog.Info("[OnDelSession] Session = %d\n", id)
 }
