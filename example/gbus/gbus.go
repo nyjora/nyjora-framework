@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"nyjora-framework/example/gbus/service"
 	"nyjora-framework/nfconf"
+	"nyjora-framework/nflog"
 	"nyjora-framework/nfnet"
 	"os"
 	"os/signal"
@@ -21,19 +22,24 @@ func Exit() {
 
 func InitConf() {
 	if len(os.Args) < 2 {
-		fmt.Println("Args too short!")
-		os.Exit(1)
+		nflog.Fatal("Args too short %v\n", len(os.Args))
+		//log.Fatalf("Args too short %d\n", len(os.Args))
 	}
 	filepath := os.Args[1]
-	fmt.Println("Read Json file : " + filepath)
+	nflog.Info("Read Json file : " + filepath)
 	err := nfconf.Init(filepath)
 	if err != nil {
-		fmt.Printf("[Main] conf init err! : %s\n", err)
-		os.Exit(1)
+		nflog.Fatal("conf init err : %v\n", err)
 	}
 }
 
+func InitLogger() {
+	nflog.Init(os.Stdout, os.Stdout, os.Stdout, os.Stdout, "gbus")
+}
+
 func main() {
+	InitLogger()
+
 	InitConf()
 	wg = &sync.WaitGroup{}
 

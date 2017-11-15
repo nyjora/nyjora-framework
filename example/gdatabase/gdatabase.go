@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"nyjora-framework/example/gdatabase/service"
 	"nyjora-framework/nfconf"
+	"nyjora-framework/nflog"
 	"nyjora-framework/nfnet"
 	"os"
 	"os/signal"
@@ -31,6 +32,10 @@ func InitConf() {
 		fmt.Printf("[Main] conf init err! : %s\n", err)
 		os.Exit(1)
 	}
+}
+
+func InitLogger() {
+	nflog.Init(os.Stdout, os.Stdout, os.Stdout, os.Stdout, "gdatabase")
 }
 
 func main() {
