@@ -1,0 +1,15 @@
+{
+    "testconfig" : {
+        "ip" : "127.0.0.1",
+        "port" : 443
+    },
+    "name": "Test",
+    "serverconfig" : {
+        "ip" : "127.0.0.1",
+        "port" : 14443
+    },
+    "clientconfig" : {
+        "ip" : "127.0.0.1",
+        "port" : 14443
+    }
+}
