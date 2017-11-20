@@ -23,7 +23,7 @@
 </root>
 -->
 <root go.package="nfrpc_test" go.proto_package="nfrpc_test">
-	<go.import pkg="nfrpc"/>
+	<go.import pkg="nyjora-framework/nfrpc"/>
 
 	<service name="World">
 

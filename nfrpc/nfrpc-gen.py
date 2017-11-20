@@ -144,7 +144,8 @@ class ServiceCompilerGo:
 			lstrip_blocks = True, # 去掉{% %}前面的空格和tab
 			trim_blocks = True) # 去掉{% %}行符
 		self._env.filters.update({
-			"capfirst": self._capfirst
+			"capfirst": self._capfirst,
+			"protoname": self._formatProtoName
 		})
 		self._template_map = {
 			"interface.go": "interface.go.jinja2",
@@ -156,6 +157,7 @@ class ServiceCompilerGo:
 			self.compileTemplateFor(directory, service)
 	
 	def compileTemplateFor(self, directory, service):
+		self._service = service
 		for (source, templatename) in self._template_map.iteritems():
 			templ = self._env.get_template(templatename)
 			content = templ.render(service.__dict__)
@@ -168,6 +170,12 @@ class ServiceCompilerGo:
 			return ""
 
 		return inputstr[0].upper() + inputstr[1:]
+
+	def _formatProtoName(self, inputstr):
+		if self._service.go_package == self._service.go_proto_package:
+			return inputstr
+		else:
+			return "%s.%s" % (self._go_proto_package, inputstr)
 
 def main():
 	optparser = OptionParser()

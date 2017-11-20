@@ -18,16 +18,16 @@ type {{interfacename}} interface {
 {% for m in methods %}
 {% if m.is_request %}
 {% if not m.async %} 
-	{{m.name}}(remote RemoteNubInfo, arg *{{go_proto_package}}.{{m.arg}}, res *{{go_proto_package}}.{{m.res}})
+	{{m.name}}(remote nfrpc.RemoteNubInfo, arg *{{m.arg|protoname}}, res *{{m.res|protoname}})
 {% else %}
 	// You need to call reply_{{m.name.lower()}}(remote, replyid, res) after finished.
 	{{m.name}}(remote RemoteNubInfo, replyid nfrpc.ReplyID, arg *{{go_proto_package}}.{{m.arg}})
 {% endif %}{# not m.async #}
 {% else %}
-	{{m.name}}(remote RemoteNubInfo, arg *{{go_proto_package}}.{{m.arg}})
+	{{m.name}}(remote nfrpc.RemoteNubInfo, arg *{{m.arg|protoname}})
 {% endif %}{# m.is_request #}
 {% endfor %}{# m in methods #}
 
-	handle_{{name.lower()}}_unknown_bubble(remote RemoteNubInfo, msgid nfrpc.MethodID, data *binary)
-	handle_{{name.lower()}}_bad_bubble(remote RemoteNubInfo, msgid nfrpc.MethodID, data *binary)
+	Handle{{name|capfirst}}UnknownBubble(remote nfrpc.RemoteNubInfo, msgid nfrpc.MethodID, data bytes.Bytes)
+	Handle{{name|capfirst}}BadBubble(remote nfrpc.RemoteNubInfo, msgid nfrpc.MethodID, data *binary)
 };
