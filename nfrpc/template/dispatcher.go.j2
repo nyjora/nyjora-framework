@@ -1,0 +1,138 @@
+package {{go_package}}
+
+import
+(
+	"fmt"
+
+	"nyjora-framework/nflog"
+	"nyjora-framework/nfrpc"
+
+	"github.com/golang/protobuf/proto"
+
+{% for pkg in go_imports %}
+	"{{pkg}}"
+{% endfor %}{# pkg in go_imports #}
+{% for pkg in go_private_imports %}
+	"{{pkg}}"
+{% endfor %}{# pkg in go_private_imports #}
+)
+
+{% set servicename = name | capfirst %}
+{% set interfacename = name | capfirst + "Interface" %}
+{% set dispatchername = name | capfirst + "Dispatcher" %}
+{% set methodmapname = name | lower + "_methods" %}
+
+type handle{{servicename}}Method func(target *{{dispatchername}}, remote nfrpc.NubInfo, data []byte) error
+
+var {{methodmapname}} map[nfrpc.MethodID]handle{{servicename}}Method
+
+type {{dispatchername}} struct {
+    target {{interfacename}}
+	nub *nfrpc.BubbleNub
+}
+
+func (d *{{dispatchername}}) SetTarget(t {{interfacename}}) {
+    d.target = t
+}
+
+func (d *WorldDispatcher) SetNub(nub *nfrpc.BubbleNub) {
+    d.nub = nub
+}
+
+func (d *{{dispatchername}}) HandleBubble(remote nfrpc.NubInfo, methodid nfrpc.MethodID,
+		data []byte) error {
+    if d.target == nil {
+        nflog.Err("d.target == nil")
+		return fmt.Errorf("d.target == nil")
+    }
+
+    handler, exists := {{methodmapname}}[methodid]
+    if !exists {
+        nflog.Err("unknown method: %d", methodid)
+		return fmt.Errorf("unknown method: %d", methodid)
+	}
+
+    return handler(d, remote, data)
+}
+
+{% for m in methods %}
+func handle{{m.name|capfirst}}(d *{{dispatchername}}, remote nfrpc.NubInfo,
+		data []byte) error {
+{% if m.is_request %}
+
+	buffer := proto.NewBuffer(data)
+	var replyid nfrpc.ReplyID
+    replyid, err := buffer.DecodeVarint()
+	if err != nil {
+        nflog.Err("failed to decode replyid: %s", err.Error())
+		return fmt.Errorf("failed to decode replyid: %s", err.Error())
+    }
+
+	var arg {{m.arg|protoname}}
+    err = buffer.Unmarshal(&arg)
+    if err != nil {
+		nflog.Err("failed to unmarshal protobuf: %s", err.Error())
+		return fmt.Errorf("failed to unmarshal protobuf: %s", err.Error())
+	}
+
+{% if m.async %}
+	d.target.{{m.name}}(remote, replyid, &arg)
+{% else %}
+	var res {{m.res|protoname}}
+	d.target.{{m.name}}(remote, &arg, &res)
+	d.Reply{{m.name|capfirst}}(remote, replyid, &res)
+	if err != nil {
+		nflog.Err("failed to send reply: %s", err.Error())
+		return fmt.Errorf("failed to send reply: %s", err.Error())
+	}
+{% endif %}{# m.async #}
+
+	return nil
+
+{% else %}
+	buffer := proto.NewBuffer(data)
+	var arg {{m.arg|protoname}}
+	err := buffer.Unmarshal(&arg)
+    if err != nil {
+		nflog.Err("failed to unmarshal protobuf: %s", err.Error())
+		return fmt.Errorf("failed to unmarshal protobuf: %s", err.Error())
+	}
+
+	d.target.{{m.name}}(remote, &arg)
+	return nil
+{% endif %}{# m.is_request #}
+}
+{% endfor %}{# m in methods #}
+
+{% for m in methods if m.is_request %}
+{% set replyname = "Reply" + m.name|capfirst %}
+func (d *{{dispatchername}}) {{replyname}}(remote nfrpc.NubInfo,
+		replyid nfrpc.ReplyID, res *{{m.res|protoname}}) error {
+	if d.nub == nil {
+		nflog.Err("d.nub == nil")
+		return fmt.Errorf("d.nub == nil")
+	}
+
+	var buffer proto.Buffer
+	err := buffer.EncodeVarint(replyid)
+	if err != nil {
+		nflog.Err("failed to encode replyid: %s", err.Error())
+		return fmt.Errorf("failed to encode replyid: %s", err.Error())
+	}
+
+	err = buffer.Marshal(res)
+	if err != nil {
+		nflog.Err("failed to marshal res: %s", err.Error())
+		return fmt.Errorf("failed to marshal res: %s", err.Error())
+	}
+
+	return d.nub.ForwardBubble(remote, -{{m.type}}, buffer.Bytes())
+}
+{% endfor %}{# m in methods if m.is_request #}
+
+func init() {
+{% for m in methods %}
+	{{methodmapname}} [{{m.type}}] = handle{{m.name | capfirst}}
+{% endfor %}{# m in methods #}
+}
+

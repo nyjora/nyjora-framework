@@ -148,8 +148,8 @@ class ServiceCompilerGo:
 			"protoname": self._formatProtoName
 		})
 		self._template_map = {
-			"interface.go": "interface.go.jinja2",
-			"dispatcher.go": "dispatcher.go.jinja2"
+			"interface.go": "interface.go.j2",
+			"dispatcher.go": "dispatcher.go.j2"
 		}
 
 	def compile(self, services, directory):

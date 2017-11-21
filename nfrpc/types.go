@@ -1,17 +1,17 @@
 package nfrpc
 
-import(
-	"bytes"
-)
-
-type MethodID = uint32
+type MethodID = int32
 type ReplyID = uint64
 
 type Emitter interface {
-	HandleBubble(remote RemoteNubInfo, methodid MethodID, data *bytes.Buffer)
+	HandleBubble(remote NubInfo, methodid MethodID, data []byte) error
 }
 
 type Dispatcher interface {
-	HandleBubble(remote RemoteNubInfo, methodid MethodID, data *bytes.Buffer)
+	HandleBubble(remote NubInfo, methodid MethodID, data []byte) error
 }
 
+type NubForwarder interface {
+	ForwardBubble(remote NubInfo, local NubInfo,
+		methodid MethodID, data []byte) error
+}

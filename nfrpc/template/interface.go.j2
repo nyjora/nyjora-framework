@@ -1,0 +1,30 @@
+
+package {{go_package}}
+
+import (
+	"nyjora-framework/nfrpc"
+
+{% for pkg in go_imports %}
+	"{{pkg}}"
+{% endfor %}{# pkg in go_imports #}
+{% for pkg in go_private_imports %}
+	"{{pkg}}"
+{% endfor %}{# pkg in go_private_imports #}
+)
+
+{%- set interfacename = name | capfirst + "Interface" %}
+
+type {{interfacename}} interface {
+{% for m in methods %}
+{% if m.is_request %}
+{% if not m.async %} 
+	{{m.name}}(remote nfrpc.NubInfo, arg *{{m.arg|protoname}}, res *{{m.res|protoname}})
+{% else %}
+	// You need to call Reply{{m.name|capfirst}}(remote, replyid, res) after finished.
+	{{m.name}}(remote nfrpc.NubInfo, replyid nfrpc.ReplyID, arg *{{m.arg|protoname}})
+{% endif %}{# not m.async #}
+{% else %}
+	{{m.name}}(remote nfrpc.NubInfo, arg *{{m.arg|protoname}})
+{% endif %}{# m.is_request #}
+{% endfor %}{# m in methods #}
+};

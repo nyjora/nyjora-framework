@@ -23,8 +23,6 @@
 </root>
 -->
 <root go.package="nfrpc_test" go.proto_package="nfrpc_test">
-	<go.import pkg="nyjora-framework/nfrpc"/>
-
 	<service name="World">
 
 		<message name="hello" type="1" arg="Integer" reliable="true"/>
