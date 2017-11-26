@@ -1,0 +1,200 @@
+#include "{{name.lower()}}_emitter.h"
+#include "nlog.h"
+#include "octets.h"
+#include "marshal.h"
+#include "nrpc_util.h"
+#include "remote_nub_info.h"
+		
+{% set interfacename = name | capfirst + "Interface" %}
+{% set emittername = name | capfirst + "Emitter" %}
+namespace {{namespace}} {
+
+// 强制在main函数前调用一次
+const std::unordered_map<int, {{emittername}}::ReplyHandler>& __{{emittername.lower()}}_reply_handlers =
+	{{emittername}}::reply_handlers();
+
+const std::unordered_map<int, {{emittername}}::ReplyHandler>& {{emittername}}::reply_handlers() {
+	static std::unordered_map<int, {{emittername}}::ReplyHandler> reply_handlers = initHandlers();
+
+	return reply_handlers;
+}
+
+std::unordered_map<int, {{emittername}}::ReplyHandler> {{emittername}}::initHandlers() {
+	std::unordered_map<int, {{emittername}}::ReplyHandler> reply_handlers;
+
+	{% for m in methods if m.is_request %}
+	reply_handlers[{{m.type}}] = &{{emittername}}::_handle_reply_{{m.name.lower()}};
+	{% endfor %}{# m in methods if m.is_request #}
+
+	return reply_handlers;
+}
+
+{{emittername}}::{{emittername}}({{namespace}}::TimerQueue<{{namespace}}::TimeStamp>& timer_queue,
+		{{namespace}}::BubbleNub* nub)
+	: BubbleEmitter(nub), _timer_queue(timer_queue), _spinlock("{{emittername}}"),
+		_last_replyid(0) {
+}
+	
+{{emittername}}::~{{emittername}}() {
+	if (!_timer_handle.isNull()) {
+		// 比TimerQueue早释放
+		_timer_handle.cancel();
+	}
+	// 不再调用handleTimeout，避免退出时崩溃
+	//for (ReplyStubMap::iterator it = _reply_stubs.begin(); it != _reply_stubs.end(); ++it) {
+	//	it->second.handler->handleTimeout();
+	//}
+}
+		
+void {{emittername}}::handleTimeout(const {{namespace}}::TimerHandle& handle, void* userdata) {
+	{{namespace}}::TimeStamp now;;
+	{{namespace}}::getMonotonicTick(&now);
+	std::vector<ReplyStub> temp_stubs;
+	{
+		Thread::SpinLock::Scoped lock(_spinlock);
+		for (auto it = _reply_stubs.begin(); it != _reply_stubs.end();) {
+			if (it->second.expire < now) {
+				temp_stubs.push_back(it->second);
+				_reply_stubs.erase(it++);
+			} else {
+				++it;
+			}
+		}
+	}
+
+	for (auto it = temp_stubs.begin(); it != temp_stubs.end(); ++it) {
+		it->handler->handleTimeout();
+	}
+}
+		
+void {{emittername}}::handleCancel(const {{namespace}}::TimerHandle& handle, void* userdata) {
+	// Emitter或TimerQueue析构时，触发了cancel
+	_timer_handle.clear();
+}
+
+void {{emittername}}::sendRequest(int type, const ::google::protobuf::Message& arg, int timeout,
+		{{namespace}}::BubbleReplyHandler* handler, bool reliable) {
+	if (!nub()) {
+		DLOG(ERR, "Nub_ == NULL when sending request");
+		return;
+	}
+				
+	if (_last_replyid == 0 && _timer_handle.isNull()) {
+		// 延迟注册，避免不必要的资源占用
+		Thread::SpinLock::Scoped lock(_spinlock);
+		if (_last_replyid == 0 && _timer_handle.isNull()) {
+			_timer_handle = _timer_queue.add(this, 0, NRPC_SECONDS(1), 0);
+		}
+	}
+	int replyid = 0;
+	{
+		Thread::SpinLock::Scoped lock(_spinlock);
+		while(_reply_stubs.find(replyid = ++_last_replyid) != _reply_stubs.end());
+	}
+
+	Octets data;
+	data.resize(arg.ByteSize());
+	arg.SerializeWithCachedSizesToArray(reinterpret_cast<google::protobuf::uint8*>(data.begin()));
+
+	// 在protobuf数据前，插入变长的replyid字段
+	// TODO 优化效率
+	Marshal::OctetsStream os;
+	os << CompactUINT(replyid);
+	os.insert(os.end(), data.begin(), data.size());
+
+	nub()->forwardBubble({{namespace}}::RemoteNubInfo(), type, os.begin(), os.size(), reliable);
+	if (handler) {
+		Thread::SpinLock::Scoped lock(_spinlock);
+		ReplyStub& stub = _reply_stubs[replyid];
+		stub.type = type;
+		{{namespace}}::getMonotonicTick(&stub.expire);
+		stub.expire += (timeout * 1000);
+		stub.handler = handler;
+	}
+}
+		
+void {{emittername}}::sendMessage(int type, const ::google::protobuf::Message& arg, bool reliable) {
+	if (!nub()) {
+		DLOG(ERR, "Nub_ == NULL when sending message");
+		return;
+	}
+	Octets data;
+	data.resize(arg.ByteSize());
+	arg.SerializeWithCachedSizesToArray(reinterpret_cast<google::protobuf::uint8*>(data.begin()));
+	nub()->forwardBubble({{namespace}}::RemoteNubInfo(), type, data.begin(), data.size(), reliable);
+}
+
+void {{emittername}}::handleBubble(const {{namespace}}::RemoteNubInfo& remote, int type,
+		const void* buf, size_t size) {
+	NRPC_UNUSED_PARAMETER(remote);
+	Octets data(buf, size);
+	Marshal::OctetsStream is(data);
+	uint replyid;
+	try {
+		is >> CompactUINT(replyid);
+	} catch (Marshal::Exception& e) {
+		DLOG(ERR, "Marshal::Exception")
+			.P("type", type);
+		return;
+	}
+
+	ReplyStub stub;
+	{
+		Thread::SpinLock::Scoped lock(_spinlock);
+		ReplyStubMap::iterator itstub = _reply_stubs.find(replyid);
+		if (itstub == _reply_stubs.end()) {
+			DLOG(ERR, "Missed reply")
+				.P("type", type)
+				.P("replyid", replyid);
+			return;
+		}
+		stub = itstub->second;
+		_reply_stubs.erase(itstub);
+	}
+
+	if (stub.type != type) {
+		DLOG(ERR, "Wrong reply type")
+			.P("type", type)
+			.P("outtype", stub.type)
+			.P("replyid", replyid);
+		stub.handler->handleTimeout();
+		return;
+	}
+
+	auto ithandler = reply_handlers().find(type);
+	if (ithandler == reply_handlers().end()) {
+		DLOG(ERR, "Not a request")
+			.P("type", type)
+			.P("replyid", replyid);
+		stub.handler->handleTimeout();
+		return;
+	} else {
+		(this->*(ithandler->second))(stub.handler,
+			reinterpret_cast<char*>(is.begin()) + is.position(),
+			is.size() - is.position());
+	}
+}
+
+{% for m in methods if m.is_request %}
+{% set handlername = m.name + "_handler" %}
+void {{emittername}}::_handle_reply_{{m.name.lower()}}({{namespace}}::BubbleReplyHandler* handler,
+		const void* buf, size_t size) {
+	{{handlername}}* real_handler = dynamic_cast<{{handlername}}*>(handler);
+	if (!real_handler) {
+		DLOG(ERR, "Failed to convert handler")
+			.P("type", {{m.type}});
+		handler->handleTimeout();
+		return;
+	}
+	{{namespace_msg}}::{{m.res}} res;
+	if (!res.ParsePartialFromArray(buf, size)) {
+		DLOG(ERR, "Failed to parse reply")
+			.P("type", {{m.type}});
+		return;
+	}
+	real_handler->handleReply(res);
+	return;
+}
+{% endfor %}{# m in methods if m.is_request #}
+
+} // end namespace {{namespace}}
